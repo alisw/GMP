@@ -19,7 +19,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 
 #include "config.h"
 
-#include "gmp.h"
 #include "gmpxx.h"
 #include "gmp-impl.h"
 #include "tests.h"
@@ -38,10 +37,20 @@ void check_noexcept ()
   static_assert(noexcept(q1 = std::move(q2)), "sorry");
   static_assert(noexcept(f1 = std::move(f2)), "sorry");
   static_assert(noexcept(q1 = std::move(z1)), "sorry");
+
+  // Only mpz has lazy allocation for now
+  static_assert(std::is_nothrow_default_constructible<mpz_class>::value, "sorry");
+  static_assert(std::is_nothrow_move_constructible<mpz_class>::value, "sorry");
+  static_assert(!std::is_nothrow_default_constructible<mpq_class>::value, "sorry");
+  static_assert(!std::is_nothrow_move_constructible<mpq_class>::value, "sorry");
+  static_assert(!std::is_nothrow_default_constructible<mpf_class>::value, "sorry");
+  static_assert(!std::is_nothrow_move_constructible<mpf_class>::value, "sorry");
 }
 
 void check_common_type ()
 {
+#define CHECK_COMMON_TYPE1(T, Res) \
+  static_assert(std::is_same<std::common_type<T>::type, Res>::value, "sorry")
 #define CHECK_COMMON_TYPE(T, U, Res) \
   static_assert(std::is_same<std::common_type<T, U>::type, Res>::value, "sorry")
 #define CHECK_COMMON_TYPE_BUILTIN1(T, Res) \
@@ -101,10 +110,13 @@ void check_common_type ()
   CHECK_COMMON_TYPE (decltype(-z), decltype(-f), mpf_class);
   CHECK_COMMON_TYPE (decltype(-q), decltype(-f), mpf_class);
 
-  /* These could be broken by a naive common_type specialization */
-  CHECK_COMMON_TYPE (decltype(-z), decltype(-z), decltype(-z));
-  CHECK_COMMON_TYPE (decltype(-q), decltype(-q), decltype(-q));
-  CHECK_COMMON_TYPE (decltype(-f), decltype(-f), decltype(-f));
+  /* common_type now decays */
+  CHECK_COMMON_TYPE (decltype(-z), decltype(-z), mpz_class);
+  CHECK_COMMON_TYPE (decltype(-q), decltype(-q), mpq_class);
+  CHECK_COMMON_TYPE (decltype(-f), decltype(-f), mpf_class);
+  CHECK_COMMON_TYPE1 (decltype(-z), mpz_class);
+  CHECK_COMMON_TYPE1 (decltype(-q), mpq_class);
+  CHECK_COMMON_TYPE1 (decltype(-f), mpf_class);
 
   /* Painful */
   CHECK_COMMON_TYPE_BUILTIN (decltype(-z), mpz_class);

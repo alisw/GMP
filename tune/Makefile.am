@@ -29,7 +29,8 @@
 #  see https://www.gnu.org/licenses/.
 
 
-INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/tests
+AM_CPPFLAGS = -I$(top_srcdir) -I$(top_srcdir)/tests
+AM_LDFLAGS = -no-install
 
 EXTRA_DIST = alpha.asm pentium.asm sparcv9.asm hppa.asm hppa2.asm hppa2w.asm \
   ia64.asm powerpc.asm powerpc64.asm x86_64.asm many.pl
@@ -57,6 +58,7 @@ libspeed_la_SOURCES =							\
   gcdext_single.c gcdext_double.c gcdextod.c gcdextos.c			\
   hgcd_lehmer.c hgcd_appr_lehmer.c hgcd_reduce_1.c hgcd_reduce_2.c	\
   jacbase1.c jacbase2.c jacbase3.c jacbase4.c				\
+  hgcd2-1.c hgcd2-2.c hgcd2-3.c hgcd2-4.c hgcd2-5.c			\
   mod_1_div.c mod_1_inv.c mod_1_1-1.c mod_1_1-2.c modlinv.c		\
   noop.c powm_mod.c powm_redc.c pre_divrem_1.c				\
   set_strb.c set_strs.c set_strp.c time.c
@@ -94,7 +96,7 @@ speed_dynamic_SOURCES = speed.c
 speed_ext_SOURCES = speed-ext.c
 speed_ext_LDFLAGS = $(STATIC)
 
-tuneup_SOURCES = tuneup.c
+tuneup_SOURCES = tuneup.c hgcd2.c
 nodist_tuneup_SOURCES = sqr_basecase.c fac_ui.c $(TUNE_MPN_SRCS)
 tuneup_DEPENDENCIES = $(TUNE_SQR_OBJ) libspeed.la
 tuneup_LDADD = $(tuneup_DEPENDENCIES) $(TUNE_LIBS)
@@ -146,7 +148,7 @@ TUNE_MPN_SRCS_BASIC = div_qr_2.c bdiv_q.c bdiv_qr.c			\
   hgcd.c hgcd_appr.c hgcd_reduce.c					\
   mul_n.c sqr.c sec_powm.c						\
   mullo_n.c mul_fft.c mul.c tdiv_qr.c mulmod_bnm1.c sqrmod_bnm1.c	\
-  mulmid.c mulmid_n.c toom42_mulmid.c					\
+  mulmid.c mulmid_n.c toom42_mulmid.c sqrlo.c sqrlo_basecase.c		\
   nussbaumer_mul.c toom6h_mul.c toom8h_mul.c toom6_sqr.c toom8_sqr.c	\
   toom22_mul.c toom2_sqr.c toom33_mul.c toom3_sqr.c toom44_mul.c toom4_sqr.c
 
@@ -179,3 +181,6 @@ fac_ui.c: $(top_builddir)/mpz/fac_ui.c
 	echo "#include \"mpz/fac_ui.c\""             >>fac_ui.c
 
 include ../mpn/Makeasm.am
+
+.NOTPARALLEL:
+

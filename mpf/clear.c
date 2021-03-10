@@ -29,11 +29,10 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 void
-mpf_clear (mpf_ptr m)
+mpf_clear (mpf_ptr x)
 {
-  (*__gmp_free_func) (m->_mp_d, (size_t) (m->_mp_prec + 1) * GMP_LIMB_BYTES);
+  __GMP_FREE_FUNC_LIMBS (PTR(x), PREC(x) + 1);
 }

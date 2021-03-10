@@ -28,7 +28,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 
@@ -41,7 +40,7 @@ mpn_sec_tabselect (volatile mp_limb_t *rp, volatile const mp_limb_t *tab,
 {
   mp_size_t k, i;
   mp_limb_t mask;
-  volatile mp_limb_t *tp;
+  volatile const mp_limb_t *tp;
 
   for (k = 0; k < nents; k++)
     {

@@ -29,7 +29,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 void
@@ -39,7 +38,7 @@ mpz_init_set_si (mpz_ptr dest, signed long int val)
   mp_limb_t vl;
 
   ALLOC (dest) = 1;
-  PTR (dest) = (mp_ptr) (*__gmp_allocate_func) (GMP_LIMB_BYTES);
+  PTR (dest) = __GMP_ALLOCATE_FUNC_LIMBS (1);
 
   vl = (mp_limb_t) ABS_CAST (unsigned long int, val);
 

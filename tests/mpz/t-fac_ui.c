@@ -1,6 +1,6 @@
 /* Exercise mpz_fac_ui and mpz_2fac_ui.
 
-Copyright 2000-2002, 2012 Free Software Foundation, Inc.
+Copyright 2000-2002, 2012, 2015 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library test suite.
 
@@ -19,7 +19,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "tests.h"
 
@@ -43,8 +42,8 @@ main (int argc, char *argv[])
 
   if (argc > 1 && argv[1][0] == 'x')
     limit = ULONG_MAX;
-  else if (argc > 1)
-    limit = atoi (argv[1]);
+  else
+    TESTS_REPS (limit, argv, argc);
 
   /* for small limb testing */
   limit = MIN (limit, MP_LIMB_T_MAX);
@@ -83,15 +82,18 @@ main (int argc, char *argv[])
       mpz_mul_ui (f, f, n+1);  /* (n+1)! = n! * (n+1) */
     }
 
-  n = 1048573; /* a prime */
-  if (n > MP_LIMB_T_MAX)
-    n = 65521; /* a smaller prime :-) */
-  mpz_fac_ui (f, n - 1);
-  m = mpz_fdiv_ui (f, n);
+  n = 2097169; /* a prime = 1 mod 4*/
+  if (n / 2 > MP_LIMB_T_MAX)
+    n = 131041; /* a smaller prime :-) */
+  mpz_fac_ui (f, n / 2); /* ((n-1)/2)! */
+  m = mpz_fdiv_ui (f, n); /* ((n-1)/2)! mod n*/
+  mpz_set_ui (f, m);
+  mpz_mul_ui (f, f, m); /* (((n-1)/2)!)^2 */
+  m = mpz_fdiv_ui (f, n); /* (((n-1)/2)!)^2 mod n*/
   if ( m != n - 1)
     {
-      printf ("mpz_fac_ui(%lu) wrong\n", n - 1);
-      printf ("  Wilson's theorem not verified: got %lu, expected %lu.\n",m ,n - 1);
+      printf ("mpz_fac_ui(%lu) wrong\n", n / 2);
+      printf (" al-Haytham's theorem not verified: got %lu, expected %lu.\n", m, n - 1);
       abort ();
     }
 

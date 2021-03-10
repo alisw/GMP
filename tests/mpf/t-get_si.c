@@ -19,7 +19,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "tests.h"
 
@@ -136,7 +135,7 @@ check_limbdata (void)
     { 0, 0, { 0 }, 0L },    /* 0 */
 
     { 1,  1, { 1 }, 1L },   /* 1 */
-    { 1, -1, { 1 }, -1L },  /* -1 */
+    { 1, -1, { 1 }, -1UL },  /* -1 */
 
     { 0,  1, { 1 }, 0L },   /* .1 */
     { 0, -1, { 1 }, 0L },   /* -.1 */

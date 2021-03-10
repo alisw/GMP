@@ -39,7 +39,6 @@ GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 /* Evaluate in: -2, -1, 0, +1, +2, +inf
@@ -146,7 +145,7 @@ mpn_toom43_mul (mp_ptr pp,
 #endif
 
   /* Compute as1 and asm1.  */
-  flags = (enum toom6_flags) (flags ^ toom6_vm1_neg & mpn_toom_eval_dgr3_pm1 (as1, asm1, ap, n, s, a0a2));
+  flags = (enum toom6_flags) (flags ^ (toom6_vm1_neg & mpn_toom_eval_dgr3_pm1 (as1, asm1, ap, n, s, a0a2)));
 
   /* Compute bs1 and bsm1.  */
   bsm1[n] = mpn_add (bsm1, b0, n, b2, t);

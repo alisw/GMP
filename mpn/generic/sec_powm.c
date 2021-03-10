@@ -3,7 +3,7 @@
 
    Contributed to the GNU project by Torbjörn Granlund.
 
-Copyright 2007-2009, 2011, 2012, 2013 Free Software Foundation, Inc.
+Copyright 2007-2009, 2011-2014, 2018-2019 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -35,12 +35,15 @@ see https://www.gnu.org/licenses/.  */
 /*
   BASIC ALGORITHM, Compute U^E mod M, where M < B^n is odd.
 
-  1. T <- (B^n * U) mod M                Convert to REDC form
+  1. T <- (B^n * U) mod M; convert to REDC form
 
-  2. Compute table U^0, U^1, U^2... of E-dependent size
+  2. Compute table U^0, U^1, U^2... of floor(log(E))-dependent size
 
   3. While there are more bits in E
        W <- power left-to-right base-k
+
+  The article "Defeating modexp side-channel attacks with data-independent
+  execution traces", https://gmplib.org/~tege/modexp-silent.pdf, has details.
 
 
   TODO:
@@ -56,18 +59,27 @@ see https://www.gnu.org/licenses/.  */
      slowdown.
 */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
 #undef MPN_REDC_1_SEC
+#if HAVE_NATIVE_mpn_sbpi1_bdiv_r
+#define MPN_REDC_1_SEC(rp, up, mp, n, invm)				\
+  do {									\
+    mp_limb_t cy;							\
+    cy = mpn_sbpi1_bdiv_r (up, 2 * n, mp, n, invm);			\
+    mpn_cnd_sub_n (cy, rp, up + n, mp, n);				\
+  } while (0)
+#else
 #define MPN_REDC_1_SEC(rp, up, mp, n, invm)				\
   do {									\
     mp_limb_t cy;							\
     cy = mpn_redc_1 (rp, up, mp, n, invm);				\
     mpn_cnd_sub_n (cy, rp, rp, mp, n);					\
   } while (0)
+#endif
 
+#if HAVE_NATIVE_mpn_addmul_2 || HAVE_NATIVE_mpn_redc_2
 #undef MPN_REDC_2_SEC
 #define MPN_REDC_2_SEC(rp, up, mp, n, mip)				\
   do {									\
@@ -75,33 +87,16 @@ see https://www.gnu.org/licenses/.  */
     cy = mpn_redc_2 (rp, up, mp, n, mip);				\
     mpn_cnd_sub_n (cy, rp, rp, mp, n);					\
   } while (0)
-
-#if HAVE_NATIVE_mpn_addmul_2 || HAVE_NATIVE_mpn_redc_2
-#define WANT_REDC_2 1
+#else
+#define MPN_REDC_2_SEC(rp, up, mp, n, mip) /* empty */
+#undef REDC_1_TO_REDC_2_THRESHOLD
+#define REDC_1_TO_REDC_2_THRESHOLD MP_SIZE_T_MAX
 #endif
 
 /* Define our own mpn squaring function.  We do this since we cannot use a
    native mpn_sqr_basecase over TUNE_SQR_TOOM2_MAX, or a non-native one over
    SQR_TOOM2_THRESHOLD.  This is so because of fixed size stack allocations
    made inside mpn_sqr_basecase.  */
-
-#if HAVE_NATIVE_mpn_sqr_diagonal
-#define MPN_SQR_DIAGONAL(rp, up, n)					\
-  mpn_sqr_diagonal (rp, up, n)
-#else
-#define MPN_SQR_DIAGONAL(rp, up, n)					\
-  do {									\
-    mp_size_t _i;							\
-    for (_i = 0; _i < (n); _i++)					\
-      {									\
-	mp_limb_t ul, lpl;						\
-	ul = (up)[_i];							\
-	umul_ppmm ((rp)[2 * _i + 1], lpl, ul, ul << GMP_NAIL_BITS);	\
-	(rp)[2 * _i] = lpl >> GMP_NAIL_BITS;				\
-      }									\
-  } while (0)
-#endif
-
 
 #if ! HAVE_NATIVE_mpn_sqr_basecase
 /* The limit of the generic code is SQR_TOOM2_THRESHOLD.  */
@@ -112,7 +107,7 @@ see https://www.gnu.org/licenses/.  */
 #ifdef TUNE_SQR_TOOM2_MAX
 /* We slightly abuse TUNE_SQR_TOOM2_MAX here.  If it is set for an assembly
    mpn_sqr_basecase, it comes from SQR_TOOM2_THRESHOLD_MAX in the assembly
-   file.  An assembly mpn_sqr_basecase that does not define it, should allow
+   file.  An assembly mpn_sqr_basecase that does not define it should allow
    any size.  */
 #define SQR_BASECASE_LIM  SQR_TOOM2_THRESHOLD
 #endif
@@ -128,57 +123,17 @@ see https://www.gnu.org/licenses/.  */
 #ifndef SQR_BASECASE_LIM
 /* If SQR_BASECASE_LIM is now not defined, use mpn_sqr_basecase for any operand
    size.  */
-#define mpn_local_sqr(rp,up,n,tp) mpn_sqr_basecase(rp,up,n)
-#else
-/* Define our own squaring function, which uses mpn_sqr_basecase for its
-   allowed sizes, but its own code for larger sizes.  */
-static void
-mpn_local_sqr (mp_ptr rp, mp_srcptr up, mp_size_t n, mp_ptr tp)
-{
-  mp_size_t i;
-
-  ASSERT (n >= 1);
-  ASSERT (! MPN_OVERLAP_P (rp, 2*n, up, n));
-
-  if (BELOW_THRESHOLD (n, SQR_BASECASE_LIM))
-    {
-      mpn_sqr_basecase (rp, up, n);
-      return;
-    }
-
-  {
-    mp_limb_t ul, lpl;
-    ul = up[0];
-    umul_ppmm (rp[1], lpl, ul, ul << GMP_NAIL_BITS);
-    rp[0] = lpl >> GMP_NAIL_BITS;
-  }
-  if (n > 1)
-    {
-      mp_limb_t cy;
-
-      cy = mpn_mul_1 (tp, up + 1, n - 1, up[0]);
-      tp[n - 1] = cy;
-      for (i = 2; i < n; i++)
-	{
-	  mp_limb_t cy;
-	  cy = mpn_addmul_1 (tp + 2 * i - 2, up + i, n - i, up[i - 1]);
-	  tp[n + i - 2] = cy;
-	}
-      MPN_SQR_DIAGONAL (rp + 2, up + 1, n - 1);
-
-      {
-	mp_limb_t cy;
-#if HAVE_NATIVE_mpn_addlsh1_n
-	cy = mpn_addlsh1_n (rp + 1, rp + 1, tp, 2 * n - 2);
-#else
-	cy = mpn_lshift (tp, tp, 2 * n - 2, 1);
-	cy += mpn_add_n (rp + 1, rp + 1, tp, 2 * n - 2);
+#define SQR_BASECASE_LIM  MP_SIZE_T_MAX
 #endif
-	rp[2 * n - 1] += cy;
-      }
-    }
-}
-#endif
+
+#define mpn_local_sqr(rp,up,n)						\
+  do {									\
+    if (ABOVE_THRESHOLD (n, SQR_BASECASE_THRESHOLD)			\
+	&& BELOW_THRESHOLD (n, SQR_BASECASE_LIM))			\
+      mpn_sqr_basecase (rp, up, n);					\
+    else								\
+      mpn_mul_basecase(rp, up, n, up, n);				\
+  } while (0)
 
 #define getbit(p,bi) \
   ((p[(bi - 1) / GMP_NUMB_BITS] >> (bi - 1) % GMP_NUMB_BITS) & 1)
@@ -262,7 +217,7 @@ mpn_sec_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
   mp_limb_t ip[2], *mip;
   int windowsize, this_windowsize;
   mp_limb_t expbits;
-  mp_ptr pp, this_pp;
+  mp_ptr pp, this_pp, ps;
   long i;
   int cnd;
 
@@ -275,7 +230,6 @@ mpn_sec_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
 
   windowsize = win_size (enb);
 
-#if WANT_REDC_2
   if (BELOW_THRESHOLD (n, REDC_1_TO_REDC_2_THRESHOLD))
     {
       mip = ip;
@@ -288,11 +242,6 @@ mpn_sec_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
       mpn_binvert (mip, mp, 2, tp);
       mip[0] = -mip[0]; mip[1] = ~mip[1];
     }
-#else
-  mip = ip;
-  binvert_limb (mip[0], mp[0]);
-  mip[0] = -mip[0];
-#endif
 
   pp = tp;
   tp += (n << windowsize);	/* put tp after power table */
@@ -315,18 +264,34 @@ mpn_sec_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
   /* Precompute powers of b and put them in the temporary area at pp.  */
   /* scratch: |   n   |   n   | ...  |                    |   2n      |  */
   /*          | pp[0] | pp[1] | ...  | pp[2^windowsize-1] |  product  |  */
-  for (i = (1 << windowsize) - 2; i > 0; i--)
+  ps = pp + n;		/* initially B^1 */
+  if (BELOW_THRESHOLD (n, REDC_1_TO_REDC_2_THRESHOLD))
     {
-      mpn_mul_basecase (tp, this_pp, n, pp + n, n);
-      this_pp += n;
-#if WANT_REDC_2
-      if (BELOW_THRESHOLD (n, REDC_1_TO_REDC_2_THRESHOLD))
-	MPN_REDC_1_SEC (this_pp, tp, mp, n, mip[0]);
-      else
-	MPN_REDC_2_SEC (this_pp, tp, mp, n, mip);
-#else
-      MPN_REDC_1_SEC (this_pp, tp, mp, n, mip[0]);
-#endif
+      for (i = (1 << windowsize) - 2; i > 0; i -= 2)
+	{
+	  mpn_local_sqr (tp, ps, n);
+	  ps += n;
+	  this_pp += n;
+	  MPN_REDC_1_SEC (this_pp, tp, mp, n, mip[0]);
+
+	  mpn_mul_basecase (tp, this_pp, n, pp + n, n);
+	  this_pp += n;
+	  MPN_REDC_1_SEC (this_pp, tp, mp, n, mip[0]);
+	}
+    }
+  else
+    {
+      for (i = (1 << windowsize) - 2; i > 0; i -= 2)
+	{
+	  mpn_local_sqr (tp, ps, n);
+	  ps += n;
+	  this_pp += n;
+	  MPN_REDC_2_SEC (this_pp, tp, mp, n, mip);
+
+	  mpn_mul_basecase (tp, this_pp, n, pp + n, n);
+	  this_pp += n;
+	  MPN_REDC_2_SEC (this_pp, tp, mp, n, mip);
+	}
     }
 
   expbits = getbits (ep, enb, windowsize);
@@ -354,7 +319,7 @@ mpn_sec_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
 									\
       do								\
 	{								\
-	  mpn_local_sqr (tp, rp, n, tp + 2 * n);			\
+	  mpn_local_sqr (tp, rp, n);					\
 	  MPN_REDUCE (rp, tp, mp, n, mip);				\
 	  this_windowsize--;						\
 	}								\
@@ -366,48 +331,27 @@ mpn_sec_powm (mp_ptr rp, mp_srcptr bp, mp_size_t bn,
       MPN_REDUCE (rp, tp, mp, n, mip);					\
     }
 
-#if WANT_REDC_2
   if (BELOW_THRESHOLD (n, REDC_1_TO_REDC_2_THRESHOLD))
     {
-#undef MPN_MUL_N
-#undef MPN_SQR
 #undef MPN_REDUCE
-#define MPN_MUL_N(r,a,b,n)		mpn_mul_basecase (r,a,n,b,n)
-#define MPN_SQR(r,a,n)			mpn_sqr_basecase (r,a,n)
 #define MPN_REDUCE(rp,tp,mp,n,mip)	MPN_REDC_1_SEC (rp, tp, mp, n, mip[0])
       INNERLOOP;
     }
   else
     {
-#undef MPN_MUL_N
-#undef MPN_SQR
 #undef MPN_REDUCE
-#define MPN_MUL_N(r,a,b,n)		mpn_mul_basecase (r,a,n,b,n)
-#define MPN_SQR(r,a,n)			mpn_sqr_basecase (r,a,n)
 #define MPN_REDUCE(rp,tp,mp,n,mip)	MPN_REDC_2_SEC (rp, tp, mp, n, mip)
       INNERLOOP;
     }
-#else
-#undef MPN_MUL_N
-#undef MPN_SQR
-#undef MPN_REDUCE
-#define MPN_MUL_N(r,a,b,n)		mpn_mul_basecase (r,a,n,b,n)
-#define MPN_SQR(r,a,n)			mpn_sqr_basecase (r,a,n)
-#define MPN_REDUCE(rp,tp,mp,n,mip)	MPN_REDC_1_SEC (rp, tp, mp, n, mip[0])
-  INNERLOOP;
-#endif
 
   MPN_COPY (tp, rp, n);
   MPN_ZERO (tp + n, n);
 
-#if WANT_REDC_2
   if (BELOW_THRESHOLD (n, REDC_1_TO_REDC_2_THRESHOLD))
     MPN_REDC_1_SEC (rp, tp, mp, n, mip[0]);
   else
     MPN_REDC_2_SEC (rp, tp, mp, n, mip);
-#else
-  MPN_REDC_1_SEC (rp, tp, mp, n, mip[0]);
-#endif
+
   cnd = mpn_sub_n (tp, rp, mp, n);	/* we need just retval */
   mpn_cnd_sub_n (!cnd, rp, rp, mp, n);
 }
@@ -418,6 +362,7 @@ mpn_sec_powm_itch (mp_size_t bn, mp_bitcnt_t enb, mp_size_t n)
   int windowsize;
   mp_size_t redcify_itch, itch;
 
+  /* FIXME: no more _local/_basecase difference. */
   /* The top scratch usage will either be when reducing B in the 2nd redcify
      call, or more typically n*2^windowsize + 3n or 4n, in the main loop.  (It
      is 3n or 4n depending on if we use mpn_local_sqr or a native

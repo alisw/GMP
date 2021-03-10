@@ -1,6 +1,6 @@
 /* Speed measuring program.
 
-Copyright 1999-2003, 2005, 2006, 2008-2012 Free Software Foundation, Inc.
+Copyright 1999-2003, 2005, 2006, 2008-2019 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -36,9 +36,7 @@ see https://www.gnu.org/licenses/.  */
    speed_foo() wants an "r" parameter.
 
    The routines don't have help messages or descriptions, but most have
-   suggestive names.  See the source code for full details.
-
-*/
+   suggestive names.  See the source code for full details. */
 
 #include "config.h"
 
@@ -67,7 +65,6 @@ see https://www.gnu.org/licenses/.  */
 #endif
 
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"  /* for the benefit of speed-many.c */
 #include "tests.h"
@@ -89,15 +86,6 @@ SPEED_EXTRA_PROTOS
 #ifdef SPEED_EXTRA_PROTOS2
 SPEED_EXTRA_PROTOS2
 #endif
-
-
-#define MPN_FILL(ptr, size, n)          \
-  do {                                  \
-    mp_size_t __i;                      \
-    ASSERT ((size) >= 0);               \
-    for (__i = 0; __i < (size); __i++)  \
-      (ptr)[__i] = (n);                 \
-  } while (0)
 
 
 #if GMP_LIMB_BITS == 32
@@ -162,6 +150,10 @@ const struct routine_t {
 
   { "mpn_add_n",         speed_mpn_add_n,     FLAG_R_OPTIONAL },
   { "mpn_sub_n",         speed_mpn_sub_n,     FLAG_R_OPTIONAL },
+  { "mpn_add_1",         speed_mpn_add_1,     FLAG_R },
+  { "mpn_add_1_inplace", speed_mpn_add_1_inplace, FLAG_R },
+  { "mpn_sub_1",         speed_mpn_sub_1,     FLAG_R },
+  { "mpn_sub_1_inplace", speed_mpn_sub_1_inplace, FLAG_R },
 
   { "mpn_add_err1_n",    speed_mpn_add_err1_n    },
   { "mpn_add_err2_n",    speed_mpn_add_err2_n    },
@@ -284,12 +276,19 @@ const struct routine_t {
   { "mpn_xor_n",         speed_mpn_xor_n,  FLAG_R_OPTIONAL },
   { "mpn_xnor_n",        speed_mpn_xnor_n, FLAG_R_OPTIONAL },
   { "mpn_com",           speed_mpn_com              },
+  { "mpn_neg",           speed_mpn_neg              },
 
   { "mpn_popcount",      speed_mpn_popcount         },
   { "mpn_hamdist",       speed_mpn_hamdist          },
 
   { "mpn_matrix22_mul",  speed_mpn_matrix22_mul     },
 
+  { "mpn_hgcd2",         speed_mpn_hgcd2, FLAG_NODATA },
+  { "mpn_hgcd2_1",       speed_mpn_hgcd2_1, FLAG_NODATA },
+  { "mpn_hgcd2_2",       speed_mpn_hgcd2_2, FLAG_NODATA },
+  { "mpn_hgcd2_3",       speed_mpn_hgcd2_3, FLAG_NODATA },
+  { "mpn_hgcd2_4",       speed_mpn_hgcd2_4, FLAG_NODATA },
+  { "mpn_hgcd2_5",       speed_mpn_hgcd2_5, FLAG_NODATA },
   { "mpn_hgcd",          speed_mpn_hgcd             },
   { "mpn_hgcd_lehmer",   speed_mpn_hgcd_lehmer      },
   { "mpn_hgcd_appr",     speed_mpn_hgcd_appr        },
@@ -300,7 +299,9 @@ const struct routine_t {
   { "mpn_hgcd_reduce_2", speed_mpn_hgcd_reduce_2    },
 
   { "mpn_gcd_1",         speed_mpn_gcd_1,  FLAG_R_OPTIONAL },
+  { "mpn_gcd_11",        speed_mpn_gcd_11, FLAG_R_OPTIONAL },
   { "mpn_gcd_1N",        speed_mpn_gcd_1N, FLAG_R_OPTIONAL },
+  { "mpn_gcd_22",        speed_mpn_gcd_22, FLAG_R_OPTIONAL },
 
   { "mpn_gcd",           speed_mpn_gcd                    },
 
@@ -312,6 +313,9 @@ const struct routine_t {
 #if 0
   { "mpn_gcdext_lehmer",     speed_mpn_gcdext_lehmer     },
 #endif
+
+  { "mpz_nextprime",     speed_mpz_nextprime        },
+
   { "mpz_jacobi",        speed_mpz_jacobi           },
   { "mpn_jacobi_base",   speed_mpn_jacobi_base      },
   { "mpn_jacobi_base_1", speed_mpn_jacobi_base_1    },
@@ -355,6 +359,8 @@ const struct routine_t {
   { "mpn_mul_fft",       speed_mpn_mul_fft,     FLAG_R_OPTIONAL },
   { "mpn_mul_fft_sqr",   speed_mpn_mul_fft_sqr, FLAG_R_OPTIONAL },
 
+  { "mpn_sqrlo",          speed_mpn_sqrlo           },
+  { "mpn_sqrlo_basecase", speed_mpn_sqrlo_basecase  },
   { "mpn_mullo_n",        speed_mpn_mullo_n         },
   { "mpn_mullo_basecase", speed_mpn_mullo_basecase  },
 
@@ -385,6 +391,7 @@ const struct routine_t {
   { "mpn_dcpi1_bdiv_qr",       speed_mpn_dcpi1_bdiv_qr       },
   { "mpn_sbpi1_bdiv_q",        speed_mpn_sbpi1_bdiv_q        },
   { "mpn_dcpi1_bdiv_q",        speed_mpn_dcpi1_bdiv_q        },
+  { "mpn_sbpi1_bdiv_r",        speed_mpn_sbpi1_bdiv_r        },
 
   { "mpn_broot",               speed_mpn_broot,    FLAG_R },
   { "mpn_broot_invm1",         speed_mpn_broot_invm1, FLAG_R },
@@ -396,6 +403,11 @@ const struct routine_t {
 
   { "mpn_sqrtrem",       speed_mpn_sqrtrem          },
   { "mpn_rootrem",       speed_mpn_rootrem, FLAG_R  },
+  { "mpn_sqrt",          speed_mpn_sqrt             },
+  { "mpn_root",          speed_mpn_root, FLAG_R     },
+
+  { "mpn_perfect_power_p",  speed_mpn_perfect_power_p,       },
+  { "mpn_perfect_square_p", speed_mpn_perfect_square_p,      },
 
   { "mpn_fib2_ui",       speed_mpn_fib2_ui,    FLAG_NODATA },
   { "mpz_fib_ui",        speed_mpz_fib_ui,     FLAG_NODATA },
@@ -404,10 +416,14 @@ const struct routine_t {
   { "mpz_lucnum2_ui",    speed_mpz_lucnum2_ui, FLAG_NODATA },
 
   { "mpz_add",           speed_mpz_add              },
+  { "mpz_invert",        speed_mpz_invert,   FLAG_R_OPTIONAL },
   { "mpz_bin_uiui",      speed_mpz_bin_uiui, FLAG_NODATA | FLAG_R_OPTIONAL },
   { "mpz_bin_ui",        speed_mpz_bin_ui,   FLAG_NODATA | FLAG_R_OPTIONAL },
   { "mpz_fac_ui",        speed_mpz_fac_ui,   FLAG_NODATA   },
-  { "mpz_powm",          speed_mpz_powm             },
+  { "mpz_2fac_ui",       speed_mpz_2fac_ui,  FLAG_NODATA   },
+  { "mpz_mfac_uiui",     speed_mpz_mfac_uiui,  FLAG_NODATA | FLAG_R_OPTIONAL },
+  { "mpz_primorial_ui",  speed_mpz_primorial_ui, FLAG_NODATA },
+  { "mpz_powm",          speed_mpz_powm,     FLAG_R_OPTIONAL },
   { "mpz_powm_mod",      speed_mpz_powm_mod         },
   { "mpz_powm_redc",     speed_mpz_powm_redc        },
   { "mpz_powm_sec",      speed_mpz_powm_sec        },
@@ -882,6 +898,9 @@ run_gnuplot (int argc, char *argv[])
   /* Putting the key at the top left is usually good, and you can change it
      interactively if it's not. */
   fprintf (fp, "set key left\n");
+
+  /* write underscores, not subscripts */
+  fprintf (fp, "set termoption noenhanced\n");
 
   /* designed to make it possible to see crossovers easily */
   fprintf (fp, "set style data lines\n");
@@ -1360,7 +1379,7 @@ main (int argc, char *argv[])
           perror ("getrusage");
         else
           printf ("getrusage(): utime %ld.%06ld data %ld stack %ld maxresident %ld\n",
-                  r.ru_utime.tv_sec, r.ru_utime.tv_usec,
+                  (long) r.ru_utime.tv_sec, (long) r.ru_utime.tv_usec,
                   r.ru_idrss, r.ru_isrss, r.ru_ixrss);
       }
 #else

@@ -28,7 +28,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 void
@@ -39,7 +38,7 @@ mpz_array_init (mpz_ptr arr, mp_size_t arr_size, mp_size_t nbits)
   mp_size_t nlimbs;
 
   nlimbs = nbits / GMP_NUMB_BITS + 1;
-  p = (mp_ptr) (*__gmp_allocate_func) ((size_t) arr_size * nlimbs * GMP_LIMB_BYTES);
+  p = __GMP_ALLOCATE_FUNC_LIMBS (arr_size * nlimbs);
 
   for (i = 0; i < arr_size; i++)
     {

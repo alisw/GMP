@@ -36,7 +36,6 @@ GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
@@ -77,7 +76,7 @@ mpn_bc_mulmod_bnp1 (mp_ptr rp, mp_srcptr ap, mp_srcptr bp, mp_size_t rn,
   ASSERT (tp[2*rn] < GMP_NUMB_MAX);
   cy = tp[2*rn] + mpn_sub_n (rp, tp, tp+rn, rn);
   rp[rn] = 0;
-  MPN_INCR_U (rp, rn+1, cy );
+  MPN_INCR_U (rp, rn+1, cy);
 }
 
 
@@ -133,7 +132,7 @@ mpn_mulmod_bnm1 (mp_ptr rp, mp_size_t rn, mp_srcptr ap, mp_size_t an, mp_srcptr 
 
       /* We need at least an + bn >= n, to be able to fit one of the
 	 recursive products at rp. Requiring strict inequality makes
-	 the coded slightly simpler. If desired, we could avoid this
+	 the code slightly simpler. If desired, we could avoid this
 	 restriction by initially halving rn as long as rn is even and
 	 an + bn <= rn/2. */
 

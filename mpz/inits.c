@@ -1,6 +1,6 @@
 /* mpz_inits() -- Initialize multiple mpz_t variables and set them to 0.
 
-Copyright 2009 Free Software Foundation, Inc.
+Copyright 2009, 2015 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -29,21 +29,25 @@ GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
 #include <stdarg.h>
-#include <stdio.h>		/* for NULL */
-#include "gmp.h"
 #include "gmp-impl.h"
 
 void
-mpz_inits (mpz_ptr x, ...)
+mpz_inits (mpz_ptr x, ...) __GMP_NOTHROW
 {
+  static const mp_limb_t dummy_limb=0xc1a0;
   va_list  ap;
 
   va_start (ap, x);
 
-  while (x != NULL)
+  do
     {
-      mpz_init (x);
+      ALLOC (x) = 0;
+      PTR (x) = (mp_ptr) &dummy_limb;
+      SIZ (x) = 0;
+
       x = va_arg (ap, mpz_ptr);
     }
+  while (x != NULL);
+
   va_end (ap);
 }

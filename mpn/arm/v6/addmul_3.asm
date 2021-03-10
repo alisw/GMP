@@ -35,10 +35,14 @@ include(`../config.m4')
 C	     cycles/limb
 C StrongARM:	 -
 C XScale	 -
-C Cortex-A7	 ?
-C Cortex-A8	 ?
+C ARM11		 4.33
+C Cortex-A5	 3.28
+C Cortex-A7	 3.25
+C Cortex-A8	 3.17
 C Cortex-A9	 2.125
 C Cortex-A15	 2
+C Cortex-A17	 2.11
+C Cortex-A53	 4.18
 
 C TODO
 C  * Use a fast path for n <= KARATSUBA_MUL_THRESHOLD using a jump table,
