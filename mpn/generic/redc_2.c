@@ -32,7 +32,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
@@ -53,7 +52,8 @@ mpn_addmul_2 (mp_ptr rp, mp_srcptr up, mp_size_t n, mp_srcptr vp)
 }
 #endif
 
-#if defined (__GNUC__) && defined (__ia64) && W_TYPE_SIZE == 64
+#if defined (__GNUC__) && ! defined (NO_ASM) \
+  && defined (__ia64) && W_TYPE_SIZE == 64
 #define umul2low(ph, pl, uh, ul, vh, vl) \
   do {									\
     mp_limb_t _ph, _pl;							\

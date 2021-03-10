@@ -7,7 +7,7 @@
    SAFE TO REACH IT THROUGH DOCUMENTED INTERFACES.  IN FACT, IT IS ALMOST
    GUARANTEED THAT IT WILL CHANGE OR DISAPPEAR IN A FUTURE GNU MP RELEASE.
 
-Copyright 2006, 2007, 2009 Free Software Foundation, Inc.
+Copyright 2006, 2007, 2009, 2014, 2015 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -35,7 +35,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 #define BINVERT_3 MODLIMB_INVERSE_3
@@ -211,8 +210,14 @@ mpn_toom_interpolate_7pts (mp_ptr rp, mp_size_t n, enum toom7_flags flags,
   mpn_sub_n (w3, w3, w5, m);
 
   mpn_divexact_by15 (w1, w1, m);
+#ifdef HAVE_NATIVE_mpn_rsh1add_n
+  mpn_rsh1add_n (w1, w1, w5, m);
+  w1[m - 1] &= GMP_NUMB_MASK >> 1;
+#else
   mpn_add_n (w1, w1, w5, m);  ASSERT (!(w1[0] & 1));
   mpn_rshift (w1, w1, m, 1); /* w1>=0 now */
+#endif
+
   mpn_sub_n (w5, w5, w1, m);
 
   /* These bounds are valid for the 4x4 polynomial product of toom44,
@@ -251,7 +256,10 @@ mpn_toom_interpolate_7pts (mp_ptr rp, mp_size_t n, enum toom7_flags flags,
   cy = mpn_add_n (rp + 5*n, w4 + n, w5, n);
   MPN_INCR_U (w5 + n, n + 1, w4[2*n] + cy);
   if (w6n > n + 1)
-    ASSERT_NOCARRY (mpn_add (rp + 6*n, rp + 6*n, w6n, w5 + n, n + 1));
+    {
+      cy = mpn_add_n (rp + 6*n, rp + 6*n, w5 + n, n + 1);
+      MPN_INCR_U (rp + 7*n + 1, w6n - n - 1, cy);
+    }
   else
     {
       ASSERT_NOCARRY (mpn_add_n (rp + 6*n, rp + 6*n, w5 + n, w6n));

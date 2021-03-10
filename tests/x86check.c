@@ -19,7 +19,6 @@ You should have received a copy of the GNU General Public License along with
 the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 
 #include <stdio.h>
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "tests.h"
 
@@ -50,12 +49,18 @@ mp_limb_t calling_conventions_values[17] =
 
 
 /* values to check */
+#ifdef __cplusplus
+extern "C" {
+#endif
 struct {
   unsigned  control;
   unsigned  status;
   unsigned  tag;
   unsigned  other[4];
 } calling_conventions_fenv;
+#ifdef __cplusplus
+}
+#endif
 
 /* expected values, as per x86call.asm */
 #define VALUE_EBX   0x01234567

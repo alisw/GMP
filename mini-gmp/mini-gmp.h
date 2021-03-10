@@ -1,6 +1,6 @@
 /* mini-gmp, a minimalistic implementation of a GNU GMP subset.
 
-Copyright 2011-2014 Free Software Foundation, Inc.
+Copyright 2011-2015, 2017, 2019-2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -53,7 +53,11 @@ void mp_get_memory_functions (void *(**) (size_t),
 			      void *(**) (void *, size_t, size_t),
 			      void (**) (void *, size_t));
 
-typedef unsigned long mp_limb_t;
+#ifndef MINI_GMP_LIMB_TYPE
+#define MINI_GMP_LIMB_TYPE long
+#endif
+
+typedef unsigned MINI_GMP_LIMB_TYPE mp_limb_t;
 typedef long mp_size_t;
 typedef unsigned long mp_bitcnt_t;
 
@@ -82,6 +86,7 @@ void mpn_copyd (mp_ptr, mp_srcptr, mp_size_t);
 void mpn_zero (mp_ptr, mp_size_t);
 
 int mpn_cmp (mp_srcptr, mp_srcptr, mp_size_t);
+int mpn_zero_p (mp_srcptr, mp_size_t);
 
 mp_limb_t mpn_add_1 (mp_ptr, mp_srcptr, mp_size_t, mp_limb_t);
 mp_limb_t mpn_add_n (mp_ptr, mp_srcptr, mp_srcptr, mp_size_t);
@@ -106,6 +111,9 @@ mp_limb_t mpn_rshift (mp_ptr, mp_srcptr, mp_size_t, unsigned int);
 
 mp_bitcnt_t mpn_scan0 (mp_srcptr, mp_bitcnt_t);
 mp_bitcnt_t mpn_scan1 (mp_srcptr, mp_bitcnt_t);
+
+void mpn_com (mp_ptr, mp_srcptr, mp_size_t);
+mp_limb_t mpn_neg (mp_ptr, mp_srcptr, mp_size_t);
 
 mp_bitcnt_t mpn_popcount (mp_srcptr, mp_size_t);
 
@@ -213,6 +221,8 @@ void mpz_rootrem (mpz_t, mpz_t, const mpz_t, unsigned long);
 int mpz_root (mpz_t, const mpz_t, unsigned long);
 
 void mpz_fac_ui (mpz_t, unsigned long);
+void mpz_2fac_ui (mpz_t, unsigned long);
+void mpz_mfac_uiui (mpz_t, unsigned long, unsigned long);
 void mpz_bin_uiui (mpz_t, unsigned long, unsigned long);
 
 int mpz_probab_prime_p (const mpz_t, int);
@@ -281,7 +291,8 @@ int mpz_init_set_str (mpz_t, const char *, int);
   || defined (_MSL_STDIO_H)           /* Metrowerks */          \
   || defined (_STDIO_H_INCLUDED)      /* QNX4 */		\
   || defined (_ISO_STDIO_ISO_H)       /* Sun C++ */		\
-  || defined (__STDIO_LOADED)         /* VMS */
+  || defined (__STDIO_LOADED)         /* VMS */			\
+  || defined (__DEFINED_FILE)         /* musl */
 size_t mpz_out_str (FILE *, int, const mpz_t);
 #endif
 

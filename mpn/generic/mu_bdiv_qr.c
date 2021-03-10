@@ -8,7 +8,7 @@
    SAFE TO REACH THEM THROUGH DOCUMENTED INTERFACES.  IN FACT, IT IS ALMOST
    GUARANTEED THAT THEY WILL CHANGE OR DISAPPEAR IN A FUTURE GMP RELEASE.
 
-Copyright 2005-2007, 2009, 2010, 2012 Free Software Foundation, Inc.
+Copyright 2005-2007, 2009, 2010, 2012, 2017 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -44,7 +44,6 @@ see https://www.gnu.org/licenses/.  */
    for developing quotient bits.  This algorithm was presented at ICMS 2006.
 */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 
@@ -65,12 +64,12 @@ see https://www.gnu.org/licenses/.  */
    FIXME: Trim allocation for (qn > dn) case, 3*dn might be possible.  In
 	  particular, when dn==in, tp and rp could use the same space.
 */
-mp_limb_t
-mpn_mu_bdiv_qr (mp_ptr qp,
-		mp_ptr rp,
-		mp_srcptr np, mp_size_t nn,
-		mp_srcptr dp, mp_size_t dn,
-		mp_ptr scratch)
+static mp_limb_t
+mpn_mu_bdiv_qr_old (mp_ptr qp,
+		    mp_ptr rp,
+		    mp_srcptr np, mp_size_t nn,
+		    mp_srcptr dp, mp_size_t dn,
+		    mp_ptr scratch)
 {
   mp_size_t qn;
   mp_size_t in;
@@ -243,11 +242,46 @@ mpn_mu_bdiv_qr (mp_ptr qp,
     }
 }
 
+mp_limb_t
+mpn_mu_bdiv_qr (mp_ptr qp,
+		mp_ptr rp,
+		mp_srcptr np, mp_size_t nn,
+		mp_srcptr dp, mp_size_t dn,
+		mp_ptr scratch)
+{
+  mp_limb_t cy = mpn_mu_bdiv_qr_old (qp, rp, np, nn, dp, dn, scratch);
+
+  /* R' B^{qn} = U - Q' D
+   *
+   * Q = B^{qn} - Q' (assuming Q' != 0)
+   *
+   * R B^{qn} = U + Q D = U + B^{qn} D - Q' D
+   *          = B^{qn} D + R'
+   */
+
+  if (UNLIKELY (!mpn_neg (qp, qp, nn - dn)))
+    {
+      /* Zero quotient. */
+      ASSERT (cy == 0);
+      return 0;
+    }
+  else
+    {
+      mp_limb_t cy2 = mpn_add_n (rp, rp, dp, dn);
+      ASSERT (cy2 >= cy);
+
+      return cy2 - cy;
+    }
+}
+
+
 mp_size_t
 mpn_mu_bdiv_qr_itch (mp_size_t nn, mp_size_t dn)
 {
   mp_size_t qn, in, tn, itch_binvert, itch_out, itches;
   mp_size_t b;
+
+  ASSERT_ALWAYS (DC_BDIV_Q_THRESHOLD < MU_BDIV_Q_THRESHOLD);
 
   qn = nn - dn;
 
@@ -255,34 +289,23 @@ mpn_mu_bdiv_qr_itch (mp_size_t nn, mp_size_t dn)
     {
       b = (qn - 1) / dn + 1;	/* ceil(qn/dn), number of blocks */
       in = (qn - 1) / b + 1;	/* ceil(qn/b) = ceil(qn / ceil(qn/dn)) */
-      if (BELOW_THRESHOLD (in, MUL_TO_MULMOD_BNM1_FOR_2NXN_THRESHOLD))
-	{
-	  tn = dn + in;
-	  itch_out = 0;
-	}
-      else
-	{
-	  tn = mpn_mulmod_bnm1_next_size (dn);
-	  itch_out = mpn_mulmod_bnm1_itch (tn, dn, in);
-	}
-      itch_binvert = mpn_binvert_itch (in);
-      itches = tn + itch_out;
-      return in + MAX (itches, itch_binvert);
     }
   else
     {
       in = qn - (qn >> 1);
-      if (BELOW_THRESHOLD (in, MUL_TO_MULMOD_BNM1_FOR_2NXN_THRESHOLD))
-	{
-	  tn = dn + in;
-	  itch_out = 0;
-	}
-      else
-	{
-	  tn = mpn_mulmod_bnm1_next_size (dn);
-	  itch_out = mpn_mulmod_bnm1_itch (tn, dn, in);
-	}
     }
+
+  if (BELOW_THRESHOLD (in, MUL_TO_MULMOD_BNM1_FOR_2NXN_THRESHOLD))
+    {
+      tn = dn + in;
+      itch_out = 0;
+    }
+  else
+    {
+      tn = mpn_mulmod_bnm1_next_size (dn);
+      itch_out = mpn_mulmod_bnm1_itch (tn, dn, in);
+    }
+
   itch_binvert = mpn_binvert_itch (in);
   itches = tn + itch_out;
   return in + MAX (itches, itch_binvert);

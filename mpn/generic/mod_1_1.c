@@ -36,7 +36,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
@@ -48,7 +47,7 @@ see https://www.gnu.org/licenses/.  */
  * add_mssaaaa is like longlong.h's add_ssaaaa, but also generates
  * carry out, in the form of a mask. */
 
-#if defined (__GNUC__)
+#if defined (__GNUC__) && ! defined (NO_ASM)
 
 #if HAVE_HOST_CPU_FAMILY_x86 && W_TYPE_SIZE == 32
 #define add_mssaaaa(m, s1, s0, a1, a0, b1, b0)				\
@@ -114,7 +113,8 @@ see https://www.gnu.org/licenses/.  */
 	     "subfe	%0, %0, %0\n\t"					\
 	     "nor	%0, %0, %0"					\
 	   : "=r" (m), "=r" (s1), "=&r" (s0)				\
-	   : "r"  (a1), "r" (b1), "%r" (a0), "rI" (b0))
+	   : "r"  (a1), "r" (b1), "%r" (a0), "rI" (b0)			\
+	     __CLOBBER_CC)
 #endif
 
 #if defined (__s390x__) && W_TYPE_SIZE == 64
@@ -129,7 +129,7 @@ see https://www.gnu.org/licenses/.  */
 	     "%2" ((UDItype)(a0)), "r" ((UDItype)(b0)) __CLOBBER_CC)
 #endif
 
-#if defined (__arm__) && W_TYPE_SIZE == 32
+#if defined (__arm__) && !defined (__thumb__) && W_TYPE_SIZE == 32
 #define add_mssaaaa(m, sh, sl, ah, al, bh, bl)				\
   __asm__ (  "adds	%2, %5, %6\n\t"					\
 	     "adcs	%1, %3, %4\n\t"					\
@@ -256,7 +256,7 @@ mpn_mod_1_1p_cps (mp_limb_t cps[4], mp_limb_t b)
       cps[2] = B1modb >> cnt;
     }
   B2modb = - b * bi;
-  ASSERT (B2modb <= b);    // NB: equality iff b = B/2
+  ASSERT (B2modb <= b);    /* NB: equality iff b = B/2 */
   cps[3] = B2modb;
 }
 

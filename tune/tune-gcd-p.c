@@ -142,7 +142,7 @@ struct bench_data
 static double
 bench_gcd (void *ctx, int p)
 {
-  struct bench_data *data = ctx;
+  struct bench_data *data = (struct bench_data *) ctx;
   double t;
 
   p_table[data->n] = p;
@@ -204,7 +204,8 @@ main(int argc, char **argv)
       if (best_time > lehmer_time)
 	best_p = 0;
 
-      printf("%6d %6d %5.3g", n, best_p, (double) best_p / n);
+      printf("%6lu %6lu %5.3g", (unsigned long) n, (unsigned long) best_p,
+	     (double) best_p / n);
       if (best_p > 0)
 	{
 	  double speedup = 100 * (lehmer_time - best_time) / lehmer_time;

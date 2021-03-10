@@ -1,4 +1,4 @@
-/* Copyright 2012 Free Software Foundation, Inc.
+/* Copyright 2012, 2015 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library test suite.
 
@@ -19,7 +19,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 #include <stdlib.h>		/* for strtol */
 #include <stdio.h>		/* for printf */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 #include "tests/tests.h"
@@ -39,16 +38,7 @@ main (int argc, char **argv)
 
   TMP_MARK;
 
-  if (argc > 1)
-    {
-      char *end;
-      count = strtol (argv[1], &end, 0);
-      if (*end || count <= 0)
-	{
-	  fprintf (stderr, "Invalid test count: %s.\n", argv[1]);
-	  return 1;
-	}
-    }
+  TESTS_REPS (count, argv, argc);
 
   tests_start ();
   rands = RANDS;
@@ -87,7 +77,7 @@ main (int argc, char **argv)
       mpn_powlo (pp, rp, &k, 1, n, scratch);
       mpn_mullo_n (app, ap, pp, n);
 
-      if (app[0] != 1 || !mpn_zero_p (app+1, n-1))
+      if (app[0] != 1 || !(n == 1 || mpn_zero_p (app+1, n-1)))
 	{
 	  gmp_fprintf (stderr,
 		       "mpn_brootinv returned bad result: %u limbs\n",

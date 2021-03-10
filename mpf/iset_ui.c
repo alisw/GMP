@@ -28,7 +28,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 void
@@ -38,7 +37,7 @@ mpf_init_set_ui (mpf_ptr r, unsigned long int val)
   mp_size_t size;
 
   r->_mp_prec = prec;
-  r->_mp_d = (mp_ptr) (*__gmp_allocate_func) ((size_t) (prec + 1) * GMP_LIMB_BYTES);
+  r->_mp_d = __GMP_ALLOCATE_FUNC_LIMBS (prec + 1);
   r->_mp_d[0] = val & GMP_NUMB_MASK;
   size = (val != 0);
 

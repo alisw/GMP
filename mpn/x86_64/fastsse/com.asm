@@ -1,6 +1,7 @@
 dnl  AMD64 mpn_com optimised for CPUs with fast SSE.
 
-dnl  Copyright 2003, 2005, 2007, 2011, 2012 Free Software Foundation, Inc.
+dnl  Copyright 2003, 2005, 2007, 2011, 2012, 2015 Free Software Foundation,
+dnl  Inc.
 
 dnl  Contributed to the GNU project by Torbjorn Granlund.
 
@@ -36,13 +37,21 @@ C	     cycles/limb     cycles/limb     cycles/limb      good
 C              aligned	      unaligned	      best seen	     for cpu?
 C AMD K8,K9	 2.0		 2.0				N
 C AMD K10	 0.85		 1.3				Y/N
-C AMD bd1	 1.40		 1.40				Y
+C AMD bull	 1.40		 1.40				Y
+C AMD pile     0.9-1.4	       0.9-1.4				Y
+C AMD steam
+C AMD excavator
 C AMD bobcat	 3.1		 3.1				N
+C AMD jaguar	 0.91		 0.91		opt/opt		Y
 C Intel P4	 2.28		 illop				Y
 C Intel core2	 1.02		 1.02				N
 C Intel NHM	 0.53		 0.68				Y
-C Intel SBR	 0.51		 0.75				Y
+C Intel SBR	 0.51		 0.75		opt/0.65	Y/N
+C Intel IBR	 0.50		 0.57		opt/opt		Y
+C Intel HWL	 0.51		 0.64		opt/0.58	Y
+C Intel BWL	 0.61		 0.65		0.57/opt	Y
 C Intel atom	 3.68		 3.68				N
+C Intel SLM	 1.09		 1.35				N
 C VIA nano	 1.17		 5.09				Y/N
 
 C We try to do as many 16-byte operations as possible.  The top-most and
@@ -69,8 +78,9 @@ ASM_START()
 PROLOGUE(mpn_com)
 	FUNC_ENTRY(3)
 
-	test	n, n
-	jz	L(don)
+IFDOS(`	add	$-56, %rsp	')
+IFDOS(`	movdqa	%xmm6, (%rsp)	')
+IFDOS(`	movdqa	%xmm7, 16(%rsp)	')
 
 	pcmpeqb	%xmm7, %xmm7		C set to 111...111
 
@@ -156,6 +166,10 @@ L(sma):	add	$14, n
 	not	%rax
 	mov	%rax, (rp)
 1:
-L(don):	FUNC_EXIT()
+L(don):
+IFDOS(`	movdqa	(%rsp), %xmm6	')
+IFDOS(`	movdqa	16(%rsp), %xmm7	')
+IFDOS(`	add	$56, %rsp	')
+	FUNC_EXIT()
 	ret
 EPILOGUE()

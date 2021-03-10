@@ -1,7 +1,7 @@
 /* Reference mpn functions, designed to be simple, portable and independent
    of the normal gmp code.  Speed isn't a consideration.
 
-Copyright 1996-2009, 2011-2013 Free Software Foundation, Inc.
+Copyright 1996-2009, 2011-2014 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library test suite.
 
@@ -31,7 +31,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 #include <stdio.h>  /* for NULL */
 #include <stdlib.h> /* for malloc */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
@@ -1863,12 +1862,12 @@ refmpn_mulmid (mp_ptr rp, mp_srcptr up, mp_size_t un,
 void
 refmpn_mul (mp_ptr wp, mp_srcptr up, mp_size_t un, mp_srcptr vp, mp_size_t vn)
 {
-  mp_ptr tp;
+  mp_ptr tp, rp;
   mp_size_t tn;
 
   if (vn < TOOM3_THRESHOLD)
     {
-      /* In the mpn_mul_basecase and toom2 range, use our own mul_basecase.  */
+      /* In the mpn_mul_basecase and toom2 ranges, use our own mul_basecase. */
       if (vn != 0)
 	refmpn_mul_basecase (wp, up, un, vp, vn);
       else
@@ -1876,51 +1875,49 @@ refmpn_mul (mp_ptr wp, mp_srcptr up, mp_size_t un, mp_srcptr vp, mp_size_t vn)
       return;
     }
 
+  MPN_ZERO (wp, vn);
+  rp = refmpn_malloc_limbs (2 * vn);
+
   if (vn < TOOM4_THRESHOLD)
-    {
-      /* In the toom3 range, use mpn_toom22_mul.  */
-      tn = 2 * vn + mpn_toom22_mul_itch (vn, vn);
-      tp = refmpn_malloc_limbs (tn);
-      mpn_toom22_mul (tp, up, vn, vp, vn, tp + 2 * vn);
-    }
+    tn = mpn_toom22_mul_itch (vn, vn);
   else if (vn < TOOM6_THRESHOLD)
-    {
-      /* In the toom4 range, use mpn_toom33_mul.  */
-      tn = 2 * vn + mpn_toom33_mul_itch (vn, vn);
-      tp = refmpn_malloc_limbs (tn);
-      mpn_toom33_mul (tp, up, vn, vp, vn, tp + 2 * vn);
-    }
+    tn = mpn_toom33_mul_itch (vn, vn);
   else if (vn < FFT_THRESHOLD)
-    {
-      /* In the toom6 range, use mpn_toom44_mul.  */
-      tn = 2 * vn + mpn_toom44_mul_itch (vn, vn);
-      tp = refmpn_malloc_limbs (tn);
-      mpn_toom44_mul (tp, up, vn, vp, vn, tp + 2 * vn);
-    }
+    tn = mpn_toom44_mul_itch (vn, vn);
   else
-    {
-      /* Finally, for the largest operands, use mpn_toom6h_mul.  */
-      tn = 2 * vn + mpn_toom6h_mul_itch (vn, vn);
-      tp = refmpn_malloc_limbs (tn);
-      mpn_toom6h_mul (tp, up, vn, vp, vn, tp + 2 * vn);
-    }
+    tn = mpn_toom6h_mul_itch (vn, vn);
+  tp = refmpn_malloc_limbs (tn);
 
-  if (un != vn)
+  while (un >= vn)
     {
-      if (un - vn < vn)
-	refmpn_mul (wp + vn, vp, vn, up + vn, un - vn);
+      if (vn < TOOM4_THRESHOLD)
+	/* In the toom3 range, use mpn_toom22_mul.  */
+	mpn_toom22_mul (rp, up, vn, vp, vn, tp);
+      else if (vn < TOOM6_THRESHOLD)
+	/* In the toom4 range, use mpn_toom33_mul.  */
+	mpn_toom33_mul (rp, up, vn, vp, vn, tp);
+      else if (vn < FFT_THRESHOLD)
+	/* In the toom6 range, use mpn_toom44_mul.  */
+	mpn_toom44_mul (rp, up, vn, vp, vn, tp);
       else
-	refmpn_mul (wp + vn, up + vn, un - vn, vp, vn);
+	/* For the largest operands, use mpn_toom6h_mul.  */
+	mpn_toom6h_mul (rp, up, vn, vp, vn, tp);
 
-      MPN_COPY (wp, tp, vn);
-      ASSERT_NOCARRY (refmpn_add (wp + vn, wp + vn, un, tp + vn, vn));
-    }
-  else
-    {
-      MPN_COPY (wp, tp, 2 * vn);
+      ASSERT_NOCARRY (refmpn_add (wp, rp, 2 * vn, wp, vn));
+      wp += vn;
+
+      up += vn;
+      un -= vn;
     }
 
   free (tp);
+
+  if (un != 0)
+    {
+      refmpn_mul (rp, vp, vn, up, un);
+      ASSERT_NOCARRY (refmpn_add (wp, rp, un + vn, wp, vn));
+    }
+  free (rp);
 }
 
 void
@@ -1942,6 +1939,12 @@ void
 refmpn_sqr (mp_ptr dst, mp_srcptr src, mp_size_t size)
 {
   refmpn_mul (dst, src, size, src, size);
+}
+
+void
+refmpn_sqrlo (mp_ptr dst, mp_srcptr src, mp_size_t size)
+{
+  refmpn_mullo_n (dst, src, src, size);
 }
 
 /* Allowing usize<vsize, usize==0 or vsize==0. */
@@ -1977,6 +1980,68 @@ refmpn_mul_any (mp_ptr prodp,
 
 
 mp_limb_t
+refmpn_gcd_11 (mp_limb_t x, mp_limb_t y)
+{
+  /* The non-ref function also requires input operands to be odd, but
+     below refmpn_gcd_1 doesn't guarantee that. */
+  ASSERT (x > 0);
+  ASSERT (y > 0);
+  do
+    {
+      while ((x & 1) == 0)  x >>= 1;
+      while ((y & 1) == 0)  y >>= 1;
+
+      if (x < y)
+	MP_LIMB_T_SWAP (x, y);
+
+      x -= y;
+    }
+  while (x != 0);
+
+  return y;
+}
+
+mp_double_limb_t
+refmpn_gcd_22 (mp_limb_t x1, mp_limb_t x0, mp_limb_t y1, mp_limb_t y0)
+{
+  mp_double_limb_t g;
+  mp_limb_t cy;
+  ASSERT ((x0 & 1) != 0);
+  ASSERT ((y0 & 1) != 0);
+
+  do
+    {
+      while ((x0 & 1) == 0)
+	{
+	  x0 = (x1 << (GMP_NUMB_BITS - 1)) | (x0 >> 1);
+	  x1 >>= 1;
+	}
+      while ((y0 & 1) == 0)
+	{
+	  y0 = (y1 << (GMP_NUMB_BITS - 1)) | (y0 >> 1);
+	  y1 >>= 1;
+	}
+
+
+      if (x1 < y1 || (x1 == y1 && x0 < y0))
+	{
+	  mp_limb_t t;
+	  t = x1; x1 = y1; y1 = t;
+	  t = x0; x0 = y0; y0 = t;
+	}
+
+      cy = (x0 < y0);
+      x0 -= y0;
+      x1 -= y1 + cy;
+    }
+  while ((x1 | x0) != 0);
+
+  g.d1 = y1;
+  g.d0 = y0;
+  return g;
+}
+
+mp_limb_t
 refmpn_gcd_1 (mp_srcptr xp, mp_size_t xsize, mp_limb_t y)
 {
   mp_limb_t  x;
@@ -1999,20 +2064,7 @@ refmpn_gcd_1 (mp_srcptr xp, mp_size_t xsize, mp_limb_t y)
       twos++;
     }
 
-  for (;;)
-    {
-      while ((x & 1) == 0)  x >>= 1;
-      while ((y & 1) == 0)  y >>= 1;
-
-      if (x < y)
-	MP_LIMB_T_SWAP (x, y);
-
-      x -= y;
-      if (x == 0)
-	break;
-    }
-
-  return y << twos;
+  return refmpn_gcd_11 (x, y) << twos;
 }
 
 

@@ -7,7 +7,7 @@
    SAFE TO REACH IT THROUGH DOCUMENTED INTERFACES.  IN FACT, IT IS ALMOST
    GUARANTEED THAT IT WILL CHANGE OR DISAPPEAR IN A FUTURE GMP RELEASE.
 
-Copyright 2009, 2012, 2013 Free Software Foundation, Inc.
+Copyright 2009, 2012-2014, 2017 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -35,7 +35,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 #if GMP_LIMB_BITS > 50
@@ -80,13 +79,14 @@ mpn_bdiv_qr_wrap (mp_ptr qp, mp_ptr rp,
 
 mp_bitcnt_t
 mpn_remove (mp_ptr wp, mp_size_t *wn,
-	    mp_ptr up, mp_size_t un, mp_ptr vp, mp_size_t vn,
+	    mp_srcptr up, mp_size_t un, mp_srcptr vp, mp_size_t vn,
 	    mp_bitcnt_t cap)
 {
-  mp_ptr    pwpsp[LOG];
+  mp_srcptr pwpsp[LOG];
   mp_size_t pwpsn[LOG];
   mp_size_t npowers;
-  mp_ptr tp, qp, np, pp, qp2;
+  mp_ptr tp, qp, np, qp2;
+  mp_srcptr pp;
   mp_size_t pn, nn, qn, i;
   mp_bitcnt_t pwr;
   TMP_DECL;
@@ -98,9 +98,9 @@ mpn_remove (mp_ptr wp, mp_size_t *wn,
 
   TMP_MARK;
 
-  tp = TMP_ALLOC_LIMBS ((un + 1 + vn) / 2); /* remainder */
-  qp = TMP_ALLOC_LIMBS (un + 1);	/* quotient, alternating */
-  qp2 = TMP_ALLOC_LIMBS (un + 1);	/* quotient, alternating */
+  TMP_ALLOC_LIMBS_3 (qp, un + 1,	/* quotient, alternating */
+		     qp2, un + 1,	/* quotient, alternating */
+		     tp, (un + 1 + vn) / 2); /* remainder */
   pp = vp;
   pn = vn;
 
@@ -113,15 +113,20 @@ mpn_remove (mp_ptr wp, mp_size_t *wn,
       qp[qn] = 0;
       mpn_bdiv_qr_wrap (qp2, tp, qp, qn + 1, pp, pn);
       if (!mpn_zero_p (tp, pn))
-	break;			/* could not divide by V^npowers */
+	{
+	  if (mpn_cmp (tp, pp, pn) != 0)
+	    break;		/* could not divide by V^npowers */
+	}
 
       MP_PTR_SWAP (qp, qp2);
       qn = qn - pn;
+      mpn_neg (qp, qp, qn+1);
+
       qn += qp[qn] != 0;
 
       pwpsp[npowers] = pp;
       pwpsn[npowers] = pn;
-      npowers++;
+      ++npowers;
 
       if (((mp_bitcnt_t) 2 << npowers) - 1 > cap)
 	break;
@@ -142,7 +147,7 @@ mpn_remove (mp_ptr wp, mp_size_t *wn,
 
   pwr = ((mp_bitcnt_t) 1 << npowers) - 1;
 
-  for (i = npowers - 1; i >= 0; i--)
+  for (i = npowers; --i >= 0;)
     {
       pn = pwpsn[i];
       if (qn < pn)
@@ -154,10 +159,15 @@ mpn_remove (mp_ptr wp, mp_size_t *wn,
       qp[qn] = 0;
       mpn_bdiv_qr_wrap (qp2, tp, qp, qn + 1, pwpsp[i], pn);
       if (!mpn_zero_p (tp, pn))
-	continue;		/* could not divide by V^i */
+	{
+	  if (mpn_cmp (tp, pwpsp[i], pn) != 0)
+	    continue;		/* could not divide by V^i */
+	}
 
       MP_PTR_SWAP (qp, qp2);
       qn = qn - pn;
+      mpn_neg (qp, qp, qn+1);
+
       qn += qp[qn] != 0;
 
       pwr += (mp_bitcnt_t) 1 << i;

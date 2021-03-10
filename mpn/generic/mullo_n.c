@@ -35,21 +35,8 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
-
-#ifndef MULLO_BASECASE_THRESHOLD
-#define MULLO_BASECASE_THRESHOLD 0	/* never use mpn_mul_basecase */
-#endif
-
-#ifndef MULLO_DC_THRESHOLD
-#define MULLO_DC_THRESHOLD 3*MUL_TOOM22_THRESHOLD
-#endif
-
-#ifndef MULLO_MUL_N_THRESHOLD
-#define MULLO_MUL_N_THRESHOLD MUL_FFT_THRESHOLD
-#endif
 
 #if TUNE_PROGRAM_BUILD || WANT_FAT_BINARY
 #define MAYBE_range_basecase 1

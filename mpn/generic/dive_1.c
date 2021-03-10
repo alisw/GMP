@@ -32,7 +32,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 
@@ -118,7 +117,6 @@ mpn_divexact_1 (mp_ptr dst, mp_srcptr src, mp_size_t size, mp_limb_t divisor)
 	  umul_ppmm (h, dummy, l, divisor);
 	  c += h;
 	}
-      while (i < size);
 
       ls = s >> shift;
       l = ls - c;

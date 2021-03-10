@@ -1,6 +1,6 @@
 /*
 
-Copyright 2012, 2013 Free Software Foundation, Inc.
+Copyright 2012-2014, 2016, 2020 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library test suite.
 
@@ -39,13 +39,16 @@ test_small (void)
     const char *decimal;
   } data[] = {
     { "183407", "183407" },
-    { " 763959", "763959" },
+    { " 763959", "763959 " },
     { "9 81999", "981999" },
-    { "10\t7398", "107398" },
+    { "10\t7398 ", "107398" },
     { "-9585 44", "-00958544" },
     { "-0", "0000" },
     { " -000  ", "0" },
     { "0704436", "231710" },
+    /* Check the case of large number of leading zeros. */
+    { "0000000000000000000000000", "0000000000000000000000000" },
+    { "000000000000000000000000704436", "000000000000000000000000231710" },
     { " 02503517", "689999" },
     { "0 1312143", "365667" },
     { "-03 274062", "-882738" },
@@ -71,6 +74,14 @@ test_small (void)
     { "0X7fc47", "523335" },
     { "0X8167c", "530044" },
     /* Some invalid inputs */
+    { "", NULL },
+    { "0x", NULL },
+    { "0b", NULL },
+    { "0z", NULL },
+    { "-", NULL },
+    { "-0x ", NULL },
+    { "0|1", NULL },
+    { "4+4", NULL },
     { "0ab", NULL },
     { "10x0", NULL },
     { "0xxab", NULL },
@@ -145,12 +156,24 @@ testmain (int argc, char **argv)
     fprintf (stderr,
 	     "Failed to create temporary file. Skipping mpz_out_str tests.\n");
 
+  if (mpz_out_str (tmp, 63, a) != 0)
+    {
+      printf ("mpz_out_str did not return 0 (error) with base > 62\n");
+      abort ();
+    }
+
+  if (mpz_out_str (tmp, -37, a) != 0)
+    {
+      printf ("mpz_out_str did not return 0 (error) with base < -37\n");
+      abort ();
+    }
+
   for (i = 0; i < COUNT; i++)
     {
       int base;
-      for (base = 0; base <= 36; base += 1 + (base == 0))
+      for (base = 0; base <= 62; base += 1 + (base == 0))
 	{
-	  hex_random_str_op (MAXBITS, i&1 ? base: -base, &ap, &rp);
+	  hex_random_str_op (MAXBITS, (i&1 || base > 36) ? base: -base, &ap, &rp);
 	  if (mpz_set_str (a, ap, 16) != 0)
 	    {
 	      fprintf (stderr, "mpz_set_str failed on input %s\n", ap);
@@ -170,7 +193,7 @@ testmain (int argc, char **argv)
 		       base, (unsigned) arn, (unsigned)bn);
 	      abort ();
 	    }
-	  bp = mpz_get_str (NULL, i&1 ? base: -base, a);
+	  bp = mpz_get_str (NULL, (i&1 || base > 36) ? base: -base, a);
 	  if (strcmp (bp, rp))
 	    {
 	      fprintf (stderr, "mpz_get_str failed:\n");
@@ -186,7 +209,7 @@ testmain (int argc, char **argv)
 	    {
 	      size_t tn;
 	      rewind (tmp);
-	      tn = mpz_out_str (tmp, i&1 ? base: -base, a);
+	      tn = mpz_out_str (tmp, (i&1 || base > 36) ? base: -base, a);
 	      if (tn != rn)
 		{
 		  fprintf (stderr, "mpz_out_str, bad return value:\n");
@@ -238,12 +261,12 @@ testmain (int argc, char **argv)
 	      size_t i;
 	      const char *absr;
 	      mp_limb_t t[MAXLIMBS];
-	      mp_size_t tn = mpz_size (a);
+	      size_t tn = mpz_size (a);
 
 	      assert (tn <= MAXLIMBS);
 	      mpn_copyi (t, a->_mp_d, tn);
 
-	      bn = mpn_get_str (bp, base, t, tn);
+	      bn = mpn_get_str ((unsigned char *) bp, base, t, tn);
 	      if (bn != arn)
 		{
 		  fprintf (stderr, "mpn_get_str failed:\n");
@@ -261,11 +284,11 @@ testmain (int argc, char **argv)
 	      for (i = 0; i < bn; i++)
 		{
 		  unsigned char digit = absr[i];
-		  unsigned value;
+		  char value;
 		  if (digit >= '0' && digit <= '9')
 		    value = digit - '0';
 		  else if (digit >= 'a' && digit <= 'z')
-		    value = digit - 'a' + 10;
+		    value = digit - 'a' + ((base > 36) ? 36 : 10);
 		  else if (digit >= 'A' && digit <= 'Z')
 		    value = digit - 'A' + 10;
 		  else
@@ -286,7 +309,7 @@ testmain (int argc, char **argv)
 		      abort ();
 		    }
 		}
-	      tn = mpn_set_str (t, bp, bn, base);
+	      tn = mpn_set_str (t, (unsigned char *) bp, bn, base);
 	      if (tn != mpz_size (a) || mpn_cmp (t, a->_mp_d, tn))
 		{
 		  fprintf (stderr, "mpn_set_str failed:\n");
@@ -299,6 +322,7 @@ testmain (int argc, char **argv)
 		}
 	    }
 	  free (ap);
+	  free (rp);
 	  testfree (bp);
 	}
     }

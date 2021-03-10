@@ -68,9 +68,11 @@ see https://www.gnu.org/licenses/.  */
 #endif
 
 #include <stdlib.h>		/* for NULL */
-#include "gmp.h"
 #include "gmp-impl.h"
 
+static mp_limb_t mpn_preinv_mu_divappr_q (mp_ptr, mp_srcptr, mp_size_t,
+			 mp_srcptr, mp_size_t, mp_srcptr, mp_size_t, mp_ptr);
+static mp_size_t mpn_mu_divappr_q_choose_in (mp_size_t, mp_size_t, int);
 
 mp_limb_t
 mpn_mu_divappr_q (mp_ptr qp,
@@ -113,7 +115,7 @@ mpn_mu_divappr_q (mp_ptr qp,
     {
       MPN_COPY (tp + 1, dp, in);
       tp[0] = 1;
-      mpn_invertappr (ip, tp, in + 1, NULL);
+      mpn_invertappr (ip, tp, in + 1, tp + in + 1);
       MPN_COPY_INCR (ip, ip + 1, in);
     }
   else
@@ -123,7 +125,7 @@ mpn_mu_divappr_q (mp_ptr qp,
 	MPN_ZERO (ip, in);
       else
 	{
-	  mpn_invertappr (ip, tp, in + 1, NULL);
+	  mpn_invertappr (ip, tp, in + 1, tp + in + 1);
 	  MPN_COPY_INCR (ip, ip + 1, in);
 	}
     }
@@ -156,7 +158,7 @@ mpn_mu_divappr_q (mp_ptr qp,
   return qh;
 }
 
-mp_limb_t
+static mp_limb_t
 mpn_preinv_mu_divappr_q (mp_ptr qp,
 			 mp_srcptr np,
 			 mp_size_t nn,
@@ -312,7 +314,7 @@ mpn_preinv_mu_divappr_q (mp_ptr qp,
    (c) qn < dn/3:       in = qn
    In all cases we have in <= dn.
  */
-mp_size_t
+static mp_size_t
 mpn_mu_divappr_q_choose_in (mp_size_t qn, mp_size_t dn, int k)
 {
   mp_size_t in;
@@ -348,7 +350,7 @@ mpn_mu_divappr_q_choose_in (mp_size_t qn, mp_size_t dn, int k)
 mp_size_t
 mpn_mu_divappr_q_itch (mp_size_t nn, mp_size_t dn, int mua_k)
 {
-  mp_size_t qn, in, itch_local, itch_out;
+  mp_size_t qn, in, itch_local, itch_out, itch_invapp;
 
   qn = nn - dn;
   if (qn + 1 < dn)
@@ -359,5 +361,8 @@ mpn_mu_divappr_q_itch (mp_size_t nn, mp_size_t dn, int mua_k)
 
   itch_local = mpn_mulmod_bnm1_next_size (dn + 1);
   itch_out = mpn_mulmod_bnm1_itch (itch_local, dn, in);
-  return in + dn + itch_local + itch_out;
+  itch_invapp = mpn_invertappr_itch (in + 1) + in + 2; /* 3in + 4 */
+
+  ASSERT (dn + itch_local + itch_out >= itch_invapp);
+  return in + MAX (dn + itch_local + itch_out, itch_invapp);
 }

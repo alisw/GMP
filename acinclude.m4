@@ -1,7 +1,7 @@
 dnl  GMP specific autoconf macros
 
 
-dnl  Copyright 2000-2006, 2009, 2011, 2013, 2014 Free Software Foundation, Inc.
+dnl  Copyright 2000-2006, 2009, 2011, 2013-2018 Free Software Foundation, Inc.
 dnl
 dnl  This file is part of the GNU MP Library.
 dnl
@@ -63,7 +63,7 @@ define(X86_PATTERN,
 [[i?86*-*-* | k[5-8]*-*-* | pentium*-*-* | athlon-*-* | viac3*-*-* | geode*-*-* | atom-*-*]])
 
 define(X86_64_PATTERN,
-[[athlon64-*-* | k8-*-* | k10-*-* | bobcat-*-* | jaguar-*-* | bulldozer-*-* | piledriver-*-* | steamroller-*-* | excavator-*-* | pentium4-*-* | atom-*-* | core2-*-* | corei*-*-* | x86_64-*-* | nano-*-*]])
+[[athlon64-*-* | k8-*-* | k10-*-* | bobcat-*-* | jaguar*-*-* | bulldozer*-*-* | piledriver*-*-* | steamroller*-*-* | excavator*-*-* | zen*-*-* | pentium4-*-* | atom-*-* | silvermont-*-* | goldmont-*-* | core2-*-* | corei*-*-* | x86_64-*-* | nano-*-* | nehalem*-*-* | westmere*-*-* | sandybridge*-*-* | ivybridge*-*-* | haswell*-*-* | broadwell*-*-* | skylake*-*-* | kabylake*-*-*]])
 
 dnl  GMP_FAT_SUFFIX(DSTVAR, DIRECTORY)
 dnl  ---------------------------------
@@ -609,11 +609,12 @@ GMP_PROG_CC_WORKS_PART([$1], [long long reliability test 1],
 
 #if defined (__GNUC__) && ! defined (__cplusplus)
 typedef unsigned long long t1;typedef t1*t2;
+void g(){}
+void h(){}
 static __inline__ t1 e(t2 rp,t2 up,int n,t1 v0)
 {t1 c,x,r;int i;if(v0){c=1;for(i=1;i<n;i++){x=up[i];r=x+1;rp[i]=r;}}return c;}
-f(){static const struct{t1 n;t1 src[9];t1 want[9];}d[]={{1,{0},{1}},};t1 got[9];int i;
+void f(){static const struct{t1 n;t1 src[9];t1 want[9];}d[]={{1,{0},{1}},};t1 got[9];int i;
 for(i=0;i<1;i++){if(e(got,got,9,d[i].n)==0)h();g(i,d[i].src,d[i].n,got,d[i].want,9);if(d[i].n)h();}}
-h(){}g(){}
 #else
 int dummy;
 #endif
@@ -625,8 +626,23 @@ GMP_PROG_CC_WORKS_PART([$1], [long long reliability test 2],
    1666 to get an ICE with -O1 -mpowerpc64.  */
 
 #if defined (__GNUC__) && ! defined (__cplusplus)
-f(int u){int i;long long x;x=u?~0:0;if(x)for(i=0;i<9;i++);x&=g();if(x)g();}
-g(){}
+int g();
+void f(int u){int i;long long x;x=u?~0:0;if(x)for(i=0;i<9;i++);x&=g();if(x)g();}
+int g(){return 0;}
+#else
+int dummy;
+#endif
+])
+
+GMP_PROG_CC_WORKS_PART([$1], [freebsd hacked gcc],
+[/* Provokes an ICE on i386-freebsd with the FreeBSD-hacked gcc, under
+   -O2 -march=amdfam10.  We call helper functions here "open" and "close" in
+   order for linking to succeed.  */
+
+#if defined (__GNUC__) && ! defined (__cplusplus)
+int open(int*,int*,int);void*close(int);void g(int*rp,int*up,int un){
+__builtin_expect(un<=0x7f00,1)?__builtin_alloca(un):close(un);if(__builtin_clzl
+(up[un])){open(rp,up,un);while(1){if(rp[un-1]!=0)break;un--;}}}
 #else
 int dummy;
 #endif
@@ -725,9 +741,9 @@ main ()
   long i;
   for (i = 0; i < 88 + 1; i++)
     a[i] = ~0L;
-  r = malloc (10000 * sizeof (unsigned long));
+  r = calloc (10000, sizeof (unsigned long));
   r2 = r;
-  for (i = 0; i < 528; i += 22)
+  for (i = 0; i < 528; i += 23)
     {
       lshift_com (r2, a,
 		  i / (8 * sizeof (unsigned long)) + 1,
@@ -737,6 +753,7 @@ main ()
   if (r[2048] != 0 || r[2049] != 0 || r[2050] != 0 || r[2051] != 0 ||
       r[2052] != 0 || r[2053] != 0 || r[2054] != 0)
     abort ();
+  free (r);
   return 0;
 }
 #else
@@ -890,8 +907,8 @@ dnl  a workaround for a HP compiler bug.
 
 AC_DEFUN([GMP_C_TEST_SIZEOF],
 [echo "configure: testlist $2" >&AC_FD_CC
-[gmp_sizeof_type=`echo "$2" | sed 's/sizeof-\([a-z]*\).*/\1/'`]
-[gmp_sizeof_want=`echo "$2" | sed 's/sizeof-[a-z]*-\([0-9]*\).*/\1/'`]
+[gmp_sizeof_type=`echo "$2" | sed 's/sizeof-\([a-z\*]*\).*/\1/'`]
+[gmp_sizeof_want=`echo "$2" | sed 's/sizeof-[a-z\*]*-\([0-9]*\).*/\1/'`]
 AC_MSG_CHECKING([compiler $1 has sizeof($gmp_sizeof_type)==$gmp_sizeof_want])
 cat >conftest.c <<EOF
 [int
@@ -1647,8 +1664,11 @@ rm -f conftest*
 
 
 dnl Checks whether the stack can be marked nonexecutable by passing an option
-dnl to the C-compiler when acting on .s files. Appends that option to ASFLAGS.
+dnl to the C-compiler when acting on .s files. Appends that option to ASMFLAGS.
 dnl This macro is adapted from one found in GLIBC-2.3.5.
+dnl FIXME: This test looks broken. It tests that a file with .note.GNU-stack...
+dnl can be compiled/assembled with -Wa,--noexecstack.  It does not determine
+dnl if that command-line option has any effect on general asm code.
 AC_DEFUN([CL_AS_NOEXECSTACK],[
 dnl AC_REQUIRE([AC_PROG_CC]) GMP uses something else
 AC_CACHE_CHECK([whether assembler supports --noexecstack option],
@@ -1735,9 +1755,9 @@ EOF
 gmp_compile="$CC $CFLAGS $CPPFLAGS -c conftest.c >&AC_FD_CC"
 if AC_TRY_EVAL(gmp_compile); then
   $NM conftest.$OBJEXT >conftest.out
-  if grep _gurkmacka conftest.out >/dev/null; then
+  if grep "[[ 	]]_gurkmacka" conftest.out >/dev/null; then
     gmp_cv_asm_underscore=yes
-  elif grep gurkmacka conftest.out >/dev/null; then
+  elif grep "[[ 	]]gurkmacka" conftest.out >/dev/null; then
     gmp_cv_asm_underscore=no
   else
     echo "configure: $NM doesn't have gurkmacka:" >&AC_FD_CC
@@ -1783,8 +1803,8 @@ AC_REQUIRE([GMP_PROG_NM])
 AC_CACHE_CHECK([if .align assembly directive is logarithmic],
                gmp_cv_asm_align_log,
 [GMP_TRY_ASSEMBLE(
-[      	$gmp_cv_asm_data
-      	.align  4
+[	$gmp_cv_asm_data
+	.align  4
 	$gmp_cv_asm_globl	foo
 	$gmp_cv_asm_byte	1
 	.align	4
@@ -1838,10 +1858,10 @@ AC_DEFUN([GMP_ASM_ALIGN_FILL_0x90],
 AC_CACHE_CHECK([if the .align directive accepts an 0x90 fill in .text],
                gmp_cv_asm_align_fill_0x90,
 [GMP_TRY_ASSEMBLE(
-[      	$gmp_cv_asm_text
-      	.align  4, 0x90
+[	$gmp_cv_asm_text
+	.align  4, 0x90
 	.byte   0
-      	.align  4, 0x90],
+	.align  4, 0x90],
 [if grep "Warning: Fill parameter ignored for executable section" conftest.out >/dev/null; then
   echo "Suppressing this warning by omitting 0x90" 1>&AC_FD_CC
   gmp_cv_asm_align_fill_0x90=no
@@ -2639,6 +2659,8 @@ AC_DEFUN([GMP_ASM_X86_MULX],
 ])
 case $gmp_cv_asm_x86_mulx in
 yes)
+  AC_DEFINE(X86_ASM_MULX, 1,
+  [Define to 1 if the assembler understands the mulx instruction])
   ifelse([$1],,:,[$1])
   ;;
 *)
@@ -2646,45 +2668,6 @@ yes)
   AC_MSG_WARN([| WARNING WARNING WARNING])
   AC_MSG_WARN([| Host CPU has the mulx instruction, but it can't be])
   AC_MSG_WARN([| assembled by])
-  AC_MSG_WARN([|     $CCAS $CFLAGS $CPPFLAGS])
-  AC_MSG_WARN([| Older x86 instructions will be used.])
-  AC_MSG_WARN([| This will be an inferior build.])
-  AC_MSG_WARN([+----------------------------------------------------------])
-  ifelse([$2],,:,[$2])
-  ;;
-esac
-])
-
-
-dnl  GMP_ASM_X86_ADX([ACTION-IF-YES][,ACTION-IF-NO])
-dnl  ------------------------------------------------
-dnl  Determine whether the assembler supports the adcx and adox instructions
-dnl  which debut with the Haswell shrink Broadwell.
-dnl
-dnl  This macro is wanted before GMP_ASM_TEXT, so ".text" is hard coded
-dnl  here.  ".text" is believed to be correct on all x86 systems, certainly
-dnl  it's all GMP_ASM_TEXT gives currently.  Actually ".text" probably isn't
-dnl  needed at all, at least for just checking instruction syntax.
-
-AC_DEFUN([GMP_ASM_X86_ADX],
-[AC_CACHE_CHECK([if the assembler knows about the adox instruction],
-		gmp_cv_asm_x86_adx,
-[GMP_TRY_ASSEMBLE(
-[	.text
-	adox	%r8, %r9
-	adcx	%r8, %r9],
-  [gmp_cv_asm_x86_adx=yes],
-  [gmp_cv_asm_x86_adx=no])
-])
-case $gmp_cv_asm_x86_adx in
-yes)
-  ifelse([$1],,:,[$1])
-  ;;
-*)
-  AC_MSG_WARN([+----------------------------------------------------------])
-  AC_MSG_WARN([| WARNING WARNING WARNING])
-  AC_MSG_WARN([| Host CPU has the adcx and adox instructions, but they])
-  AC_MSG_WARN([| can't be assembled by])
   AC_MSG_WARN([|     $CCAS $CFLAGS $CPPFLAGS])
   AC_MSG_WARN([| Older x86 instructions will be used.])
   AC_MSG_WARN([| This will be an inferior build.])
@@ -3233,6 +3216,24 @@ if test $gmp_cv_c_attribute_noreturn = yes; then
 fi
 ])
 
+dnl  GMP_C_HIDDEN_ALIAS
+dnl  ------------------------
+
+AC_DEFUN([GMP_C_HIDDEN_ALIAS],
+[AC_CACHE_CHECK([whether gcc hidden aliases work],
+                gmp_cv_c_hidden_alias,
+[AC_TRY_COMPILE(
+[void hid() __attribute__ ((visibility("hidden")));
+void hid() {}
+void pub() __attribute__ ((alias("hid")));],
+, gmp_cv_c_hidden_alias=yes, gmp_cv_c_hidden_alias=no)
+])
+if test $gmp_cv_c_hidden_alias = yes; then
+  AC_DEFINE(HAVE_HIDDEN_ALIAS, 1,
+  [Define to 1 if the compiler accepts gcc style __attribute__ ((visibility))
+and __attribute__ ((alias))])
+fi
+])
 
 dnl  GMP_C_DOUBLE_FORMAT
 dnl  -------------------
@@ -3258,7 +3259,8 @@ AC_CACHE_CHECK([format of `double' floating point],
                 gmp_cv_c_double_format,
 [gmp_cv_c_double_format=unknown
 cat >conftest.c <<\EOF
-[struct foo {
+[#include <stdio.h>
+struct foo {
   char    before[8];
   double  x;
   char    after[8];
@@ -3268,9 +3270,16 @@ struct foo foo = {
   { '\001', '\043', '\105', '\147', '\211', '\253', '\315', '\357' },
   -123456789.0,
   { '\376', '\334', '\272', '\230', '\166', '\124', '\062', '\020' },
-};]
+};
+int main(){
+  int i;
+  for (i = 0; i < 8; i++) {
+    printf ("%d %f\n", foo.before[i] + foo.after[i], foo.x);
+  }
+  return 0;
+}]
 EOF
-gmp_compile="$CC $CFLAGS $CPPFLAGS -c conftest.c >&AC_FD_CC 2>&1"
+gmp_compile="$CC $CFLAGS $CPPFLAGS conftest.c -o conftest$EXEEXT >&AC_FD_CC 2>&1"
 if AC_TRY_EVAL(gmp_compile); then
 cat >conftest.awk <<\EOF
 [
@@ -3366,7 +3375,7 @@ BEGIN {
           got[12] == "124" &&  \
           got[13] == "000" &&  \
           got[14] == "000" &&  \
-	  got[15] == "000")
+          got[15] == "000")
         {
           print "IEEE big endian"
           found = 1
@@ -3423,11 +3432,11 @@ END {
 }
 ]
 EOF
-  gmp_cv_c_double_format=`od -b conftest.$OBJEXT | $AWK -f conftest.awk`
+  gmp_cv_c_double_format=`od -b conftest$EXEEXT | $AWK -f conftest.awk`
   case $gmp_cv_c_double_format in
   unknown*)
-    echo "cannot match anything, conftest.$OBJEXT contains" >&AC_FD_CC
-    od -b conftest.$OBJEXT >&AC_FD_CC
+    echo "cannot match anything, conftest$EXEEXT contains" >&AC_FD_CC
+    od -b conftest$EXEEXT >&AC_FD_CC
     ;;
   esac
 else
@@ -3691,11 +3700,11 @@ check (const char *fmt, ...)
 
   ret = vsnprintf (buf, 4, fmt, ap);
 
-  if (strcmp (buf, "hel") != 0)
+  if (ret == -1 || strcmp (buf, "hel") != 0)
     return 1;
 
   /* allowed return values */
-  if (ret != -1 && ret != 3 && ret != 11)
+  if (ret != 3 && ret != 11)
     return 2;
 
   return 0;
@@ -3815,7 +3824,7 @@ cat >conftest.c <<EOF
 int
 main ()
 {
-  exit(0);
+  return 0;
 }
 EOF
 gmp_compile="$1 conftest.c"
@@ -3889,7 +3898,7 @@ AC_CACHE_CHECK([for build system executable suffix],
 int
 main ()
 {
-  exit (0);
+  return 0;
 }
 EOF
 for i in .exe ,ff8 ""; do
@@ -3925,7 +3934,7 @@ AC_CACHE_CHECK([whether build system compiler is ANSI],
 int
 main (int argc, char **argv)
 {
-  exit(0);
+  return 0;
 }
 EOF
 gmp_compile="$CC_FOR_BUILD conftest.c"
@@ -3956,10 +3965,11 @@ AC_DEFUN([GMP_CHECK_LIBM_FOR_BUILD],
 AC_CACHE_CHECK([for build system compiler math library],
                gmp_cv_check_libm_for_build,
 [cat >conftest.c <<EOF
+#include <math.h>
 int
 main ()
 {
-  exit(0);
+  return 0;
 }
 double d;
 double

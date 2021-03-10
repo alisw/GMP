@@ -1,6 +1,6 @@
 /* Test mpf_integer_p.
 
-Copyright 2001 Free Software Foundation, Inc.
+Copyright 2001, 2014 Free Software Foundation, Inc.
 
 This file is part of the GNU MP Library test suite.
 
@@ -19,7 +19,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "tests.h"
 
@@ -74,7 +73,14 @@ main (void)
   mpf_set_str (f, "0.5", 10);
   all (f, 0);
 
+  mpf_set_str (f, "2.5", 10);
+  all (f, 0);
+
   mpf_set_ui (f, 1L);
+  mpf_div_ui (f, f, 3L);
+  all (f, 0);
+
+  mpf_set_ui (f, 7L);
   mpf_div_ui (f, f, 3L);
   all (f, 0);
 

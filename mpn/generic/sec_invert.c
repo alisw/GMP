@@ -30,7 +30,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 #if 0
@@ -50,23 +49,6 @@ mpn_cnd_neg (int cnd, mp_limb_t *rp, const mp_limb_t *ap, mp_size_t n,
 {
   mpn_lshift (scratch, ap, n, 1);
   mpn_cnd_sub_n (cnd, rp, ap, scratch, n);
-}
-
-static void
-mpn_cnd_swap (int cnd, volatile mp_limb_t *ap, volatile mp_limb_t *bp,
-	      mp_size_t n)
-{
-  volatile mp_limb_t mask = - (mp_limb_t) (cnd != 0);
-  mp_size_t i;
-  for (i = 0; i < n; i++)
-    {
-      mp_limb_t a, b, t;
-      a = ap[i];
-      b = bp[i];
-      t = (a ^ b) & mask;
-      ap[i] = a ^ t;
-      bp[i] = b ^ t;
-    }
 }
 
 static int

@@ -1,4 +1,5 @@
-/* Copyright 2006, 2007, 2009, 2010, 2013, 2014 Free Software Foundation, Inc.
+/* Copyright 2006, 2007, 2009, 2010, 2013-2015, 2018 Free Software
+   Foundation, Inc.
 
 This file is part of the GNU MP Library test suite.
 
@@ -19,7 +20,6 @@ the GNU MP Library test suite.  If not, see https://www.gnu.org/licenses/.  */
 #include <stdlib.h>		/* for strtol */
 #include <stdio.h>		/* for printf */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 #include "longlong.h"
 #include "tests/tests.h"
@@ -40,7 +40,7 @@ dumpy (mp_srcptr p, mp_size_t n)
       for (i = 3; i >= 0; i--)
 	{
 	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
-	  printf (" " + (i == 0));
+	  printf (i == 0 ? "" : " ");
 	}
     }
   else
@@ -48,7 +48,7 @@ dumpy (mp_srcptr p, mp_size_t n)
       for (i = n - 1; i >= 0; i--)
 	{
 	  printf ("%0*lx", (int) (2 * sizeof (mp_limb_t)), p[i]);
-	  printf (" " + (i == 0));
+	  printf (i == 0 ? "" : " ");
 	}
     }
   puts ("");
@@ -97,7 +97,7 @@ check_one (mp_ptr qp, mp_srcptr rp,
 
   ASSERT_NOCARRY (refmpn_sub_n (tp, np, tp, nn));
   tvalue = "N-Q*D";
-  if (!mpn_zero_p (tp + dn, nn - dn) || mpn_cmp (tp, dp, dn) >= 0)
+  if (!(nn == dn || mpn_zero_p (tp + dn, nn - dn)) || mpn_cmp (tp, dp, dn) >= 0)
     {
       msg = "q too small";
       goto error;
@@ -139,16 +139,7 @@ main (int argc, char **argv)
   mp_limb_t rran0, rran1, qran0, qran1;
   TMP_DECL;
 
-  if (argc > 1)
-    {
-      char *end;
-      count = strtol (argv[1], &end, 0);
-      if (*end || count <= 0)
-	{
-	  fprintf (stderr, "Invalid test count: %s.\n", argv[1]);
-	  return 1;
-	}
-    }
+  TESTS_REPS (count, argv, argc);
 
   maxdbits = MAX_DN;
   maxnbits = MAX_NN;
@@ -446,6 +437,7 @@ main (int argc, char **argv)
 	      alloc = itch + 1;
 	    }
 	  scratch[itch] = ran;
+	  MPN_COPY (qp, junkp, nn - dn + 1);
 	  mpn_div_q (qp, np, nn, dup, dn, scratch);
 	  ASSERT_ALWAYS (ran == scratch[itch]);
 	  ASSERT_ALWAYS (qp[-1] == qran0);  ASSERT_ALWAYS (qp[nn - dn + 1] == qran1);

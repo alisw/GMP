@@ -1,6 +1,7 @@
 /* gmpxx.h -- C++ class wrapper for GMP types.  -*- C++ -*-
 
-Copyright 2001-2003, 2006, 2008, 2011, 2012 Free Software Foundation, Inc.
+Copyright 2001-2003, 2006, 2008, 2011-2015, 2018 Free Software
+Foundation, Inc.
 
 This file is part of the GNU MP Library.
 
@@ -220,6 +221,11 @@ struct __gmp_binary_plus
     {
       if (q != r) mpq_set(q, r);
     }
+    else if (__GMPXX_CONSTANT(l) && l == 1)
+    {
+      mpz_add (mpq_numref(q), mpq_numref(r), mpq_denref(r));
+      if (q != r) mpz_set(mpq_denref(q), mpq_denref(r));
+    }
     else
     {
       if (q == r)
@@ -338,6 +344,11 @@ struct __gmp_binary_minus
     if (__GMPXX_CONSTANT(l) && l == 0)
     {
       if (q != r) mpq_set(q, r);
+    }
+    else if (__GMPXX_CONSTANT(l) && l == 1)
+    {
+      mpz_sub (mpq_numref(q), mpq_numref(r), mpq_denref(r));
+      if (q != r) mpz_set(mpq_denref(q), mpq_denref(r));
     }
     else
     {
@@ -689,7 +700,17 @@ struct __gmp_binary_divides
     }
   }
   static void eval(mpq_ptr q, unsigned long int l, mpq_srcptr r)
-  {  __GMPXX_TMPQ_UI;   mpq_div (q, temp, r); }
+  {
+    if (__GMPXX_CONSTANT_TRUE(l == 0))
+      mpq_set_ui(q, 0, 1);
+    else if (__GMPXX_CONSTANT_TRUE(l == 1))
+      mpq_inv(q, r);
+    else
+      {
+	__GMPXX_TMPQ_UI;
+	mpq_div (q, temp, r);
+      }
+  }
   static void eval(mpq_ptr q, mpq_srcptr r, signed long int l)
   {
     if (__GMPXX_CONSTANT_TRUE(l >= 0))
@@ -706,7 +727,22 @@ struct __gmp_binary_divides
       }
   }
   static void eval(mpq_ptr q, signed long int l, mpq_srcptr r)
-  {  __GMPXX_TMPQ_SI;   mpq_div (q, temp, r); }
+  {
+    if (__GMPXX_CONSTANT_TRUE(l == 0))
+      mpq_set_ui(q, 0, 1);
+    else if (__GMPXX_CONSTANT_TRUE(l == 1))
+      mpq_inv(q, r);
+    else if (__GMPXX_CONSTANT_TRUE(l == -1))
+      {
+	mpq_inv(q, r);
+	mpq_neg(q, q);
+      }
+    else
+      {
+	__GMPXX_TMPQ_SI;
+	mpq_div (q, temp, r);
+      }
+  }
   static void eval(mpq_ptr q, mpq_srcptr r, double d)
   {  __GMPXX_TMPQ_D;    mpq_div (q, r, temp); }
   static void eval(mpq_ptr q, double d, mpq_srcptr r)
@@ -858,6 +894,73 @@ struct __gmp_binary_xor
   { eval(z, w, d);  }
 };
 
+struct __gmp_cmp_function
+{
+  static int eval(mpz_srcptr z, mpz_srcptr w) { return mpz_cmp(z, w); }
+
+  static int eval(mpz_srcptr z, unsigned long int l)
+  { return mpz_cmp_ui(z, l); }
+  static int eval(unsigned long int l, mpz_srcptr z)
+  { return -mpz_cmp_ui(z, l); }
+  static int eval(mpz_srcptr z, signed long int l)
+  { return mpz_cmp_si(z, l); }
+  static int eval(signed long int l, mpz_srcptr z)
+  { return -mpz_cmp_si(z, l); }
+  static int eval(mpz_srcptr z, double d)
+  { return mpz_cmp_d(z, d); }
+  static int eval(double d, mpz_srcptr z)
+  { return -mpz_cmp_d(z, d); }
+
+  static int eval(mpq_srcptr q, mpq_srcptr r) { return mpq_cmp(q, r); }
+
+  static int eval(mpq_srcptr q, unsigned long int l)
+  { return mpq_cmp_ui(q, l, 1); }
+  static int eval(unsigned long int l, mpq_srcptr q)
+  { return -mpq_cmp_ui(q, l, 1); }
+  static int eval(mpq_srcptr q, signed long int l)
+  { return mpq_cmp_si(q, l, 1); }
+  static int eval(signed long int l, mpq_srcptr q)
+  { return -mpq_cmp_si(q, l, 1); }
+  static int eval(mpq_srcptr q, double d)
+  {  __GMPXX_TMPQ_D;    return mpq_cmp (q, temp); }
+  static int eval(double d, mpq_srcptr q)
+  {  __GMPXX_TMPQ_D;    return mpq_cmp (temp, q); }
+  static int eval(mpq_srcptr q, mpz_srcptr z)
+  { return mpq_cmp_z(q, z); }
+  static int eval(mpz_srcptr z, mpq_srcptr q)
+  { return -mpq_cmp_z(q, z); }
+
+  static int eval(mpf_srcptr f, mpf_srcptr g) { return mpf_cmp(f, g); }
+
+  static int eval(mpf_srcptr f, unsigned long int l)
+  { return mpf_cmp_ui(f, l); }
+  static int eval(unsigned long int l, mpf_srcptr f)
+  { return -mpf_cmp_ui(f, l); }
+  static int eval(mpf_srcptr f, signed long int l)
+  { return mpf_cmp_si(f, l); }
+  static int eval(signed long int l, mpf_srcptr f)
+  { return -mpf_cmp_si(f, l); }
+  static int eval(mpf_srcptr f, double d)
+  { return mpf_cmp_d(f, d); }
+  static int eval(double d, mpf_srcptr f)
+  { return -mpf_cmp_d(f, d); }
+  static int eval(mpf_srcptr f, mpz_srcptr z)
+  { return mpf_cmp_z(f, z); }
+  static int eval(mpz_srcptr z, mpf_srcptr f)
+  { return -mpf_cmp_z(f, z); }
+  static int eval(mpf_srcptr f, mpq_srcptr q)
+  {
+    mpf_t qf;
+    mpf_init(qf); /* Should we use the precision of f?  */
+    mpf_set_q(qf, q);
+    int ret = eval(f, qf);
+    mpf_clear(qf);
+    return ret;
+  }
+  static int eval(mpq_srcptr q, mpf_srcptr f)
+  { return -eval(f, q); }
+};
+
 struct __gmp_binary_equal
 {
   static bool eval(mpz_srcptr z, mpz_srcptr w) { return mpz_cmp(z, w) == 0; }
@@ -879,17 +982,25 @@ struct __gmp_binary_equal
   { return mpq_equal(q, r) != 0; }
 
   static bool eval(mpq_srcptr q, unsigned long int l)
-  { return mpq_cmp_ui(q, l, 1) == 0; }
+  { return ((__GMPXX_CONSTANT(l) && l == 0) ||
+	    mpz_cmp_ui(mpq_denref(q), 1) == 0) &&
+      mpz_cmp_ui(mpq_numref(q), l) == 0; }
   static bool eval(unsigned long int l, mpq_srcptr q)
   { return eval(q, l); }
   static bool eval(mpq_srcptr q, signed long int l)
-  { return mpq_cmp_si(q, l, 1) == 0; }
+  { return ((__GMPXX_CONSTANT(l) && l == 0) ||
+	    mpz_cmp_ui(mpq_denref(q), 1) == 0) &&
+      mpz_cmp_si(mpq_numref(q), l) == 0; }
   static bool eval(signed long int l, mpq_srcptr q)
   { return eval(q, l); }
   static bool eval(mpq_srcptr q, double d)
   {  __GMPXX_TMPQ_D;    return mpq_equal (q, temp) != 0; }
   static bool eval(double d, mpq_srcptr q)
   { return eval(q, d); }
+  static bool eval(mpq_srcptr q, mpz_srcptr z)
+  { return mpz_cmp_ui(mpq_denref(q), 1) == 0 && mpz_cmp(mpq_numref(q), z) == 0; }
+  static bool eval(mpz_srcptr z, mpq_srcptr q)
+  { return eval(q, z); }
 
   static bool eval(mpf_srcptr f, mpf_srcptr g) { return mpf_cmp(f, g) == 0; }
 
@@ -905,6 +1016,14 @@ struct __gmp_binary_equal
   { return mpf_cmp_d(f, d) == 0; }
   static bool eval(double d, mpf_srcptr f)
   { return eval(f, d); }
+  static bool eval(mpf_srcptr f, mpz_srcptr z)
+  { return mpf_cmp_z(f, z) == 0; }
+  static bool eval(mpz_srcptr z, mpf_srcptr f)
+  { return eval(f, z); }
+  static bool eval(mpf_srcptr f, mpq_srcptr q)
+  { return __gmp_cmp_function::eval(f, q) == 0; }
+  static bool eval(mpq_srcptr q, mpf_srcptr f)
+  { return eval(f, q); }
 };
 
 struct __gmp_binary_less
@@ -938,6 +1057,10 @@ struct __gmp_binary_less
   {  __GMPXX_TMPQ_D;    return mpq_cmp (q, temp) < 0; }
   static bool eval(double d, mpq_srcptr q)
   {  __GMPXX_TMPQ_D;    return mpq_cmp (temp, q) < 0; }
+  static bool eval(mpq_srcptr q, mpz_srcptr z)
+  { return mpq_cmp_z(q, z) < 0; }
+  static bool eval(mpz_srcptr z, mpq_srcptr q)
+  { return mpq_cmp_z(q, z) > 0; }
 
   static bool eval(mpf_srcptr f, mpf_srcptr g) { return mpf_cmp(f, g) < 0; }
 
@@ -953,6 +1076,14 @@ struct __gmp_binary_less
   { return mpf_cmp_d(f, d) < 0; }
   static bool eval(double d, mpf_srcptr f)
   { return mpf_cmp_d(f, d) > 0; }
+  static bool eval(mpf_srcptr f, mpz_srcptr z)
+  { return mpf_cmp_z(f, z) < 0; }
+  static bool eval(mpz_srcptr z, mpf_srcptr f)
+  { return mpf_cmp_z(f, z) > 0; }
+  static bool eval(mpf_srcptr f, mpq_srcptr q)
+  { return __gmp_cmp_function::eval(f, q) < 0; }
+  static bool eval(mpq_srcptr q, mpf_srcptr f)
+  { return __gmp_cmp_function::eval(q, f) < 0; }
 };
 
 struct __gmp_binary_greater
@@ -1057,52 +1188,40 @@ struct __gmp_sgn_function
   static int eval(mpf_srcptr f) { return mpf_sgn(f); }
 };
 
-struct __gmp_cmp_function
+struct __gmp_gcd_function
 {
-  static int eval(mpz_srcptr z, mpz_srcptr w) { return mpz_cmp(z, w); }
+  static void eval(mpz_ptr z, mpz_srcptr w, mpz_srcptr v)
+  { mpz_gcd(z, w, v); }
+  static void eval(mpz_ptr z, mpz_srcptr w, unsigned long int l)
+  { mpz_gcd_ui(z, w, l); }
+  static void eval(mpz_ptr z, unsigned long int l, mpz_srcptr w)
+  { eval(z, w, l); }
+  static void eval(mpz_ptr z, mpz_srcptr w, signed long int l)
+  { eval(z, w, __gmpxx_abs_ui(l)); }
+  static void eval(mpz_ptr z, signed long int l, mpz_srcptr w)
+  { eval(z, w, l); }
+  static void eval(mpz_ptr z, mpz_srcptr w, double d)
+  {  __GMPXX_TMPZ_D;    mpz_gcd (z, w, temp); }
+  static void eval(mpz_ptr z, double d, mpz_srcptr w)
+  { eval(z, w, d); }
+};
 
-  static int eval(mpz_srcptr z, unsigned long int l)
-  { return mpz_cmp_ui(z, l); }
-  static int eval(unsigned long int l, mpz_srcptr z)
-  { return -mpz_cmp_ui(z, l); }
-  static int eval(mpz_srcptr z, signed long int l)
-  { return mpz_cmp_si(z, l); }
-  static int eval(signed long int l, mpz_srcptr z)
-  { return -mpz_cmp_si(z, l); }
-  static int eval(mpz_srcptr z, double d)
-  { return mpz_cmp_d(z, d); }
-  static int eval(double d, mpz_srcptr z)
-  { return -mpz_cmp_d(z, d); }
-
-  static int eval(mpq_srcptr q, mpq_srcptr r) { return mpq_cmp(q, r); }
-
-  static int eval(mpq_srcptr q, unsigned long int l)
-  { return mpq_cmp_ui(q, l, 1); }
-  static int eval(unsigned long int l, mpq_srcptr q)
-  { return -mpq_cmp_ui(q, l, 1); }
-  static int eval(mpq_srcptr q, signed long int l)
-  { return mpq_cmp_si(q, l, 1); }
-  static int eval(signed long int l, mpq_srcptr q)
-  { return -mpq_cmp_si(q, l, 1); }
-  static int eval(mpq_srcptr q, double d)
-  {  __GMPXX_TMPQ_D;    return mpq_cmp (q, temp); }
-  static int eval(double d, mpq_srcptr q)
-  {  __GMPXX_TMPQ_D;    return mpq_cmp (temp, q); }
-
-  static int eval(mpf_srcptr f, mpf_srcptr g) { return mpf_cmp(f, g); }
-
-  static int eval(mpf_srcptr f, unsigned long int l)
-  { return mpf_cmp_ui(f, l); }
-  static int eval(unsigned long int l, mpf_srcptr f)
-  { return -mpf_cmp_ui(f, l); }
-  static int eval(mpf_srcptr f, signed long int l)
-  { return mpf_cmp_si(f, l); }
-  static int eval(signed long int l, mpf_srcptr f)
-  { return -mpf_cmp_si(f, l); }
-  static int eval(mpf_srcptr f, double d)
-  { return mpf_cmp_d(f, d); }
-  static int eval(double d, mpf_srcptr f)
-  { return -mpf_cmp_d(f, d); }
+struct __gmp_lcm_function
+{
+  static void eval(mpz_ptr z, mpz_srcptr w, mpz_srcptr v)
+  { mpz_lcm(z, w, v); }
+  static void eval(mpz_ptr z, mpz_srcptr w, unsigned long int l)
+  { mpz_lcm_ui(z, w, l); }
+  static void eval(mpz_ptr z, unsigned long int l, mpz_srcptr w)
+  { eval(z, w, l); }
+  static void eval(mpz_ptr z, mpz_srcptr w, signed long int l)
+  { eval(z, w, __gmpxx_abs_ui(l)); }
+  static void eval(mpz_ptr z, signed long int l, mpz_srcptr w)
+  { eval(z, w, l); }
+  static void eval(mpz_ptr z, mpz_srcptr w, double d)
+  {  __GMPXX_TMPZ_D;    mpz_lcm (z, w, temp); }
+  static void eval(mpz_ptr z, double d, mpz_srcptr w)
+  { eval(z, w, d); }
 };
 
 struct __gmp_rand_function
@@ -1113,6 +1232,78 @@ struct __gmp_rand_function
   { mpz_urandomm(z, s, w); }
   static void eval(mpf_ptr f, gmp_randstate_t s, mp_bitcnt_t prec)
   { mpf_urandomb(f, s, prec); }
+};
+
+struct __gmp_fac_function
+{
+  static void eval(mpz_ptr z, unsigned long l) { mpz_fac_ui(z, l); }
+  static void eval(mpz_ptr z, signed long l)
+  {
+    if (l < 0)
+      throw std::domain_error ("factorial(negative)");
+    eval(z, static_cast<unsigned long>(l));
+  }
+  static void eval(mpz_ptr z, mpz_srcptr w)
+  {
+    if (!mpz_fits_ulong_p(w))
+      {
+	if (mpz_sgn(w) < 0)
+	  throw std::domain_error ("factorial(negative)");
+	else
+	  throw std::bad_alloc(); // or std::overflow_error ("factorial")?
+      }
+    eval(z, mpz_get_ui(w));
+  }
+  static void eval(mpz_ptr z, double d)
+  {  __GMPXX_TMPZ_D;    eval (z, temp); }
+};
+
+struct __gmp_primorial_function
+{
+  static void eval(mpz_ptr z, unsigned long l) { mpz_primorial_ui(z, l); }
+  static void eval(mpz_ptr z, signed long l)
+  {
+    if (l < 0)
+      throw std::domain_error ("primorial(negative)");
+    eval(z, static_cast<unsigned long>(l));
+  }
+  static void eval(mpz_ptr z, mpz_srcptr w)
+  {
+    if (!mpz_fits_ulong_p(w))
+      {
+	if (mpz_sgn(w) < 0)
+	  throw std::domain_error ("primorial(negative)");
+	else
+	  throw std::bad_alloc(); // or std::overflow_error ("primorial")?
+      }
+    eval(z, mpz_get_ui(w));
+  }
+  static void eval(mpz_ptr z, double d)
+  {  __GMPXX_TMPZ_D;    eval (z, temp); }
+};
+
+struct __gmp_fib_function
+{
+  static void eval(mpz_ptr z, unsigned long l) { mpz_fib_ui(z, l); }
+  static void eval(mpz_ptr z, signed long l)
+  {
+    if (l < 0)
+      {
+	eval(z, -static_cast<unsigned long>(l));
+	if ((l & 1) == 0)
+	  mpz_neg(z, z);
+      }
+    else
+      eval(z, static_cast<unsigned long>(l));
+  }
+  static void eval(mpz_ptr z, mpz_srcptr w)
+  {
+    if (!mpz_fits_slong_p(w))
+      throw std::bad_alloc(); // or std::overflow_error ("fibonacci")?
+    eval(z, mpz_get_si(w));
+  }
+  static void eval(mpz_ptr z, double d)
+  {  __GMPXX_TMPZ_D;    eval (z, temp); }
 };
 
 
@@ -1232,9 +1423,9 @@ namespace std {
   };
 
   template <class T, class U>
-  struct common_type <__gmp_expr<T, U>, __gmp_expr<T, U> >
+  struct common_type <__gmp_expr<T, U> >
   {
-    typedef __gmp_expr<T, U> type;
+    typedef __gmp_expr<T, T> type;
   };
 
 #define __GMPXX_DECLARE_COMMON_TYPE(typ)	\
@@ -1268,7 +1459,7 @@ namespace std {
 template <class T, class Op>
 struct __gmp_unary_expr
 {
-  const T &val;
+  typename __gmp_resolve_ref<T>::ref_type val;
 
   __gmp_unary_expr(const T &v) : val(v) { }
 private:
@@ -1344,6 +1535,38 @@ __GMPN_DECLARE_COMPOUND_OPERATOR(fun)
   __gmp_expr & operator=(float f) { assign_d(f); return *this; } \
   __gmp_expr & operator=(double d) { assign_d(d); return *this; }
 
+#define __GMPP_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                 \
+template <class U>                                                           \
+static __gmp_expr<T, __gmp_unary_expr<__gmp_expr<T, U>, eval_fun> >          \
+fun(const __gmp_expr<T, U> &expr);
+
+#define __GMPNN_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, bigtype) \
+static inline __gmp_expr<T, __gmp_unary_expr<bigtype, eval_fun> >            \
+fun(type expr);
+
+#define __GMPNS_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type)  \
+__GMPNN_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, signed long)
+#define __GMPNU_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type)  \
+__GMPNN_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, unsigned long)
+#define __GMPND_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type)  \
+__GMPNN_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, double)
+
+#define __GMPN_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                 \
+__GMPNS_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed char)           \
+__GMPNU_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned char)         \
+__GMPNS_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed int)            \
+__GMPNU_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned int)          \
+__GMPNS_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed short int)      \
+__GMPNU_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned short int)    \
+__GMPNS_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed long int)       \
+__GMPNU_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned long int)     \
+__GMPND_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, float)                 \
+__GMPND_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, double)
+
+#define __GMP_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                  \
+__GMPP_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                         \
+__GMPN_DECLARE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)
+
 /**************** mpz_class -- wrapper for mpz_t ****************/
 
 template <>
@@ -1406,11 +1629,11 @@ public:
   mp_bitcnt_t get_prec() const { return mpf_get_default_prec(); }
 
   // constructors and destructor
-  __gmp_expr() { mpz_init(mp); }
+  __gmp_expr() __GMPXX_NOEXCEPT { mpz_init(mp); }
 
   __gmp_expr(const __gmp_expr &z) { mpz_init_set(mp, z.mp); }
 #if __GMPXX_USE_CXX11
-  __gmp_expr(__gmp_expr &&z)
+  __gmp_expr(__gmp_expr &&z) noexcept
   { *mp = *z.mp; mpz_init(z.mp); }
 #endif
   template <class T>
@@ -1524,6 +1747,10 @@ public:
 
   __GMP_DECLARE_INCREMENT_OPERATOR(operator++)
   __GMP_DECLARE_INCREMENT_OPERATOR(operator--)
+
+  __GMP_DECLARE_UNARY_STATIC_MEMFUN(mpz_t, factorial, __gmp_fac_function)
+  __GMP_DECLARE_UNARY_STATIC_MEMFUN(mpz_t, primorial, __gmp_primorial_function)
+  __GMP_DECLARE_UNARY_STATIC_MEMFUN(mpz_t, fibonacci, __gmp_fib_function)
 };
 
 typedef __gmp_expr<mpz_t, mpz_t> mpz_class;
@@ -1901,7 +2128,7 @@ public:
   // bool fits_ldouble_p() const { return mpf_fits_ldouble_p(mp); }
 
 #if __GMPXX_USE_CXX11
-  explicit operator bool() const { return mp->_mp_size != 0; }
+  explicit operator bool() const { return mpf_sgn(mp) != 0; }
 #endif
 
   // compound assignments
@@ -2112,6 +2339,24 @@ public:
 };
 
 
+// simple expressions, U is a built-in numerical type
+
+template <class T, class U, class Op>
+class __gmp_expr<T, __gmp_unary_expr<U, Op> >
+{
+private:
+  typedef U val_type;
+
+  __gmp_unary_expr<val_type, Op> expr;
+public:
+  explicit __gmp_expr(const val_type &val) : expr(val) { }
+  void eval(typename __gmp_resolve_expr<T>::ptr_type p) const
+  { Op::eval(p, expr.val); }
+  const val_type & get_val() const { return expr.val; }
+  mp_bitcnt_t get_prec() const { return mpf_get_default_prec(); }
+};
+
+
 // compound expressions
 
 template <class T, class U, class Op>
@@ -2167,7 +2412,7 @@ public:
 };
 
 
-// simple expressions, T is a built-in numerical type
+// simple expressions, U is a built-in numerical type
 
 template <class T, class U, class Op>
 class __gmp_expr<T, __gmp_binary_expr<__gmp_expr<T, T>, U, Op> >
@@ -2694,6 +2939,17 @@ fun(const __gmp_expr<T, U> &expr)                                            \
   return __gmp_expr<T, __gmp_unary_expr<__gmp_expr<T, U>, eval_fun> >(expr); \
 }
 
+// variant that only works for one of { mpz, mpq, mpf }
+
+#define __GMP_DEFINE_UNARY_FUNCTION_1(T, fun, eval_fun)                      \
+                                                                             \
+template <class U>                                                           \
+inline __gmp_expr<T, __gmp_unary_expr<__gmp_expr<T, U>, eval_fun> >          \
+fun(const __gmp_expr<T, U> &expr)                                            \
+{                                                                            \
+  return __gmp_expr<T, __gmp_unary_expr<__gmp_expr<T, U>, eval_fun> >(expr); \
+}
+
 #define __GMP_DEFINE_UNARY_TYPE_FUNCTION(type, fun, eval_fun) \
                                                               \
 template <class T, class U>                                   \
@@ -2767,6 +3023,69 @@ __GMPND_DEFINE_BINARY_FUNCTION(fun, eval_fun, double)             \
 __GMPP_DEFINE_BINARY_FUNCTION(fun, eval_fun)        \
 __GMPN_DEFINE_BINARY_FUNCTION(fun, eval_fun)
 
+// variant that only works for one of { mpz, mpq, mpf }
+
+#define __GMPP_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun)              \
+                                                                       \
+template <class U, class W>                                            \
+inline __gmp_expr<T,                                                   \
+__gmp_binary_expr<__gmp_expr<T, U>, __gmp_expr<T, W>, eval_fun> >      \
+fun(const __gmp_expr<T, U> &expr1, const __gmp_expr<T, W> &expr2)      \
+{                                                                      \
+  return __gmp_expr<T,                                                 \
+     __gmp_binary_expr<__gmp_expr<T, U>, __gmp_expr<T, W>, eval_fun> > \
+    (expr1, expr2);                                                    \
+}
+
+#define __GMPNN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type, bigtype)  \
+                                                                           \
+template <class U>                                                         \
+inline __gmp_expr                                                          \
+<T, __gmp_binary_expr<__gmp_expr<T, U>, bigtype, eval_fun> >               \
+fun(const __gmp_expr<T, U> &expr, type t)                                  \
+{                                                                          \
+  return __gmp_expr                                                        \
+    <T, __gmp_binary_expr<__gmp_expr<T, U>, bigtype, eval_fun> >(expr, t); \
+}                                                                          \
+                                                                           \
+template <class U>                                                         \
+inline __gmp_expr                                                          \
+<T, __gmp_binary_expr<bigtype, __gmp_expr<T, U>, eval_fun> >               \
+fun(type t, const __gmp_expr<T, U> &expr)                                  \
+{                                                                          \
+  return __gmp_expr                                                        \
+    <T, __gmp_binary_expr<bigtype, __gmp_expr<T, U>, eval_fun> >(t, expr); \
+}
+
+#define __GMPNS_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type)          \
+__GMPNN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type, signed long int)
+
+#define __GMPNU_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type)          \
+__GMPNN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type, unsigned long int)
+
+#define __GMPND_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type) \
+__GMPNN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type, double)
+
+#define __GMPNLD_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type)     \
+__GMPNN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, type, long double)
+
+#define __GMPN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun)              \
+__GMPNS_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, signed char)        \
+__GMPNU_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, unsigned char)      \
+__GMPNS_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, signed int)         \
+__GMPNU_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, unsigned int)       \
+__GMPNS_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, signed short int)   \
+__GMPNU_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, unsigned short int) \
+__GMPNS_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, signed long int)    \
+__GMPNU_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, unsigned long int)  \
+__GMPND_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, float)              \
+__GMPND_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, double)             \
+/* __GMPNLD_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun, long double) */
+
+#define __GMP_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun) \
+__GMPP_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun)        \
+__GMPN_DEFINE_BINARY_FUNCTION_1(T, fun, eval_fun)
+
 
 #define __GMP_DEFINE_BINARY_FUNCTION_UI(fun, eval_fun)                 \
                                                                        \
@@ -2786,9 +3105,8 @@ template <class T, class U, class V, class W>                           \
 inline type fun(const __gmp_expr<T, U> &expr1,                          \
 		const __gmp_expr<V, W> &expr2)                          \
 {                                                                       \
-  typedef typename __gmp_resolve_expr<T, V>::value_type eval_type;      \
-  __gmp_expr<eval_type, eval_type> const& temp1(expr1); \
-  __gmp_expr<eval_type, eval_type> const& temp2(expr2); \
+  __gmp_expr<T, T> const& temp1(expr1);                                 \
+  __gmp_expr<V, V> const& temp2(expr2);                                 \
   return eval_fun::eval(temp1.__get_mp(), temp2.__get_mp());            \
 }
 
@@ -2950,6 +3268,44 @@ __GMP_DEFINE_INCREMENT_OPERATOR(mpq, fun, eval_fun)
 __GMP_DEFINE_INCREMENT_OPERATOR(mpf, fun, eval_fun)
 
 
+#define __GMPP_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                  \
+template <class U>                                                           \
+__gmp_expr<T, __gmp_unary_expr<__gmp_expr<T, U>, eval_fun> >          \
+fun(const __gmp_expr<T, U> &expr)                                            \
+{                                                                            \
+  return __gmp_expr<T, __gmp_unary_expr<__gmp_expr<T, U>, eval_fun> >(expr); \
+}
+
+#define __GMPNN_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, bigtype)  \
+inline __gmp_expr<T, __gmp_unary_expr<bigtype, eval_fun> >                   \
+fun(type expr)                                                               \
+{                                                                            \
+  return __gmp_expr<T, __gmp_unary_expr<bigtype, eval_fun> >(expr);          \
+}
+
+#define __GMPNS_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type)  \
+__GMPNN_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, signed long)
+#define __GMPNU_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type)  \
+__GMPNN_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, unsigned long)
+#define __GMPND_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type)  \
+__GMPNN_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, type, double)
+
+#define __GMPN_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                 \
+__GMPNS_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed char)           \
+__GMPNU_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned char)         \
+__GMPNS_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed int)            \
+__GMPNU_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned int)          \
+__GMPNS_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed short int)      \
+__GMPNU_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned short int)    \
+__GMPNS_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, signed long int)       \
+__GMPNU_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, unsigned long int)     \
+__GMPND_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, float)                 \
+__GMPND_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun, double)                \
+
+#define __GMP_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                  \
+__GMPP_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                         \
+__GMPN_DEFINE_UNARY_STATIC_MEMFUN(T, fun, eval_fun)                         \
+
 
 /**************** Arithmetic operators and functions ****************/
 
@@ -2957,16 +3313,16 @@ __GMP_DEFINE_INCREMENT_OPERATOR(mpf, fun, eval_fun)
 
 __GMP_DEFINE_UNARY_FUNCTION(operator+, __gmp_unary_plus)
 __GMP_DEFINE_UNARY_FUNCTION(operator-, __gmp_unary_minus)
-__GMP_DEFINE_UNARY_FUNCTION(operator~, __gmp_unary_com)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpz_t, operator~, __gmp_unary_com)
 
 __GMP_DEFINE_BINARY_FUNCTION(operator+, __gmp_binary_plus)
 __GMP_DEFINE_BINARY_FUNCTION(operator-, __gmp_binary_minus)
 __GMP_DEFINE_BINARY_FUNCTION(operator*, __gmp_binary_multiplies)
 __GMP_DEFINE_BINARY_FUNCTION(operator/, __gmp_binary_divides)
-__GMP_DEFINE_BINARY_FUNCTION(operator%, __gmp_binary_modulus)
-__GMP_DEFINE_BINARY_FUNCTION(operator&, __gmp_binary_and)
-__GMP_DEFINE_BINARY_FUNCTION(operator|, __gmp_binary_ior)
-__GMP_DEFINE_BINARY_FUNCTION(operator^, __gmp_binary_xor)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpz_t, operator%, __gmp_binary_modulus)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpz_t, operator&, __gmp_binary_and)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpz_t, operator|, __gmp_binary_ior)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpz_t, operator^, __gmp_binary_xor)
 
 __GMP_DEFINE_BINARY_FUNCTION_UI(operator<<, __gmp_binary_lshift)
 __GMP_DEFINE_BINARY_FUNCTION_UI(operator>>, __gmp_binary_rshift)
@@ -2979,11 +3335,17 @@ __GMP_DEFINE_BINARY_TYPE_FUNCTION(bool, operator>, __gmp_binary_greater)
 __GMP_DEFINE_BINARY_TYPE_FUNCTION(bool, operator>=, ! __gmp_binary_less)
 
 __GMP_DEFINE_UNARY_FUNCTION(abs, __gmp_abs_function)
-__GMP_DEFINE_UNARY_FUNCTION(trunc, __gmp_trunc_function)
-__GMP_DEFINE_UNARY_FUNCTION(floor, __gmp_floor_function)
-__GMP_DEFINE_UNARY_FUNCTION(ceil, __gmp_ceil_function)
-__GMP_DEFINE_UNARY_FUNCTION(sqrt, __gmp_sqrt_function)
-__GMP_DEFINE_BINARY_FUNCTION(hypot, __gmp_hypot_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpf_t, trunc, __gmp_trunc_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpf_t, floor, __gmp_floor_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpf_t, ceil, __gmp_ceil_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpf_t, sqrt, __gmp_sqrt_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpz_t, sqrt, __gmp_sqrt_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpz_t, factorial, __gmp_fac_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpz_t, primorial, __gmp_primorial_function)
+__GMP_DEFINE_UNARY_FUNCTION_1(mpz_t, fibonacci, __gmp_fib_function)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpf_t, hypot, __gmp_hypot_function)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpz_t, gcd, __gmp_gcd_function)
+__GMP_DEFINE_BINARY_FUNCTION_1(mpz_t, lcm, __gmp_lcm_function)
 
 __GMP_DEFINE_UNARY_TYPE_FUNCTION(int, sgn, __gmp_sgn_function)
 __GMP_DEFINE_BINARY_TYPE_FUNCTION(int, cmp, __gmp_cmp_function)
@@ -3009,6 +3371,10 @@ __GMPZ_DEFINE_COMPOUND_OPERATOR_UI(operator>>=, __gmp_binary_rshift)
 
 __GMPZ_DEFINE_INCREMENT_OPERATOR(operator++, __gmp_unary_increment)
 __GMPZ_DEFINE_INCREMENT_OPERATOR(operator--, __gmp_unary_decrement)
+
+__GMP_DEFINE_UNARY_STATIC_MEMFUN(mpz_t, mpz_class::factorial, __gmp_fac_function)
+__GMP_DEFINE_UNARY_STATIC_MEMFUN(mpz_t, mpz_class::primorial, __gmp_primorial_function)
+__GMP_DEFINE_UNARY_STATIC_MEMFUN(mpz_t, mpz_class::fibonacci, __gmp_fib_function)
 
 // member operators for mpq_class
 
@@ -3283,6 +3649,7 @@ namespace std {
 
 #undef __GMPZQ_DEFINE_EXPR
 
+#undef __GMP_DEFINE_UNARY_FUNCTION_1
 #undef __GMP_DEFINE_UNARY_FUNCTION
 #undef __GMP_DEFINE_UNARY_TYPE_FUNCTION
 

@@ -32,7 +32,6 @@ You should have received copies of the GNU General Public License and the
 GNU Lesser General Public License along with the GNU MP Library.  If not,
 see https://www.gnu.org/licenses/.  */
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 
@@ -202,7 +201,7 @@ void
 mpz_addmul_ui (mpz_ptr w, mpz_srcptr x, unsigned long y)
 {
 #if BITS_PER_ULONG > GMP_NUMB_BITS
-  if (UNLIKELY (y > GMP_NUMB_MAX && SIZ(x) != 0))
+  if (UNLIKELY (y > GMP_NUMB_MAX))
     {
       mpz_t t;
       mp_ptr tp;
@@ -210,6 +209,7 @@ mpz_addmul_ui (mpz_ptr w, mpz_srcptr x, unsigned long y)
       TMP_DECL;
       TMP_MARK;
       xn = SIZ (x);
+      if (xn == 0) return;
       MPZ_TMP_INIT (t, ABS (xn) + 1);
       tp = PTR (t);
       tp[0] = 0;
@@ -230,7 +230,7 @@ void
 mpz_submul_ui (mpz_ptr w, mpz_srcptr x, unsigned long y)
 {
 #if BITS_PER_ULONG > GMP_NUMB_BITS
-  if (y > GMP_NUMB_MAX && SIZ(x) != 0)
+  if (y > GMP_NUMB_MAX)
     {
       mpz_t t;
       mp_ptr tp;
@@ -238,6 +238,7 @@ mpz_submul_ui (mpz_ptr w, mpz_srcptr x, unsigned long y)
       TMP_DECL;
       TMP_MARK;
       xn = SIZ (x);
+      if (xn == 0) return;
       MPZ_TMP_INIT (t, ABS (xn) + 1);
       tp = PTR (t);
       tp[0] = 0;

@@ -37,7 +37,6 @@ see https://www.gnu.org/licenses/.  */
 #include <stdlib.h>
 #include <string.h>
 
-#include "gmp.h"
 #include "gmp-impl.h"
 
 
@@ -80,7 +79,7 @@ gmp_sprintf_reps (char **bufp, int c, int reps)
 }
 
 static int
-gmp_sprintf_final (char **bufp, int c, int reps)
+gmp_sprintf_final (char **bufp)
 {
   char  *buf = *bufp;
   *buf = '\0';
